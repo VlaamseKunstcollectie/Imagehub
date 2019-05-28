@@ -1,0 +1,4 @@
+parameters:
+  images_folder: '../images/'
+  supported_extensions:
+    - tif
