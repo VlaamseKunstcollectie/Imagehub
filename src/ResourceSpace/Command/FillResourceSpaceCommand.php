@@ -57,6 +57,7 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
 
 
         $this->resourceSpaceData = $this->getCurrentResourceSpaceData();
+        var_dump($this->resourceSpaceData);
 
 
         // Loop through all files in the folder
@@ -80,14 +81,6 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
         }
     }
 
-    protected function getCurrentResourceSpaceData()
-    {
-        $query = 'user=' . $this->apiUsername . '&function=do_search&param1=';
-        $url = $this->apiUrl . '?' . $query . '&sign=' . $this->getSign($query);
-        $data = file_get_contents($url);
-        return $data;
-    }
-
     protected function processImage($image)
     {
         $md5 = md5_file($image);
@@ -107,6 +100,7 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
         $datahubData = array();
 
 
+        // Fetch the necessary data from the Datahub
         if(!$this->datahubEndpoint)
             $this->datahubEndpoint = Endpoint::build($this->datahubUrl);
 
@@ -117,6 +111,7 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
         $xpath = new DOMXPath($domDoc);
 
         foreach($this->dataDefinition as $key => $dataDef) {
+            // TODO we probably need to support all languages, but how do we do this in ResourceSpace?
             $query = $this->buildXpath($dataDef['xpath'], 'nl');
             $extracted = $xpath->query($query);
             $value = null;
@@ -133,11 +128,27 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
                 $datahubData[$key] = $value;
             }
         }
-        var_dump($datahubData);
+
+        // TODO compare the data in memory to the data in ResourceSpace
+        if(true) {
+            echo $this->importIntoResourceSpace(realpath($image));
+        }
     }
 
-    protected function importIntoResourceSpace()
+    protected function getCurrentResourceSpaceData()
     {
+        $query = 'user=' . $this->apiUsername . '&function=do_search&param1=';
+        $url = $this->apiUrl . '?' . $query . '&sign=' . $this->getSign($query);
+        $data = file_get_contents($url);
+        return $data;
+    }
+
+    protected function importIntoResourceSpace($image)
+    {
+        $query = 'user=' . $this->apiUsername . '&function=create_resource&param1=1&param2=0&param3=' . $image;
+        $url = $this->apiUrl . '?' . $query . '&sign=' . $this->getSign($query);
+        $data = file_get_contents($url);
+        return $data;
     }
 
     protected function getSign($query)
