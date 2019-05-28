@@ -1,4 +1,19 @@
 parameters:
-  images_folder: '../images/'
-  supported_extensions:
-    - tif
+    images_folder: '../images/'
+    api_url: 'http://resourcespace.box/api'
+    api_username: 'admin'
+    api_key: 'b1603c459927151cfec1d8f691170975d13ecc5bf4bcaa4fad1f5cf2b7e2e46c'
+    supported_extensions:
+        - tif
+
+services:
+    # makes classes in src/ available to be used as services
+    # this creates a service per class whose id is the fully-qualified class name
+    App\ResourceSpace\:
+        resource: '../src/ResourceSpace/*'
+        exclude: '../src/ResourceSpace/{DependencyInjection,Entity,Migrations,Tests,Kernel.php}'
+
+    app.command.fill_resourcespace_command:
+        class: App\ResourceSpace\Command\FillResourceSpaceCommand
+        tags:
+            -  { name: console.command }

@@ -1,6 +1,7 @@
 {
+    "name": "vlaamsekunstcollectie/imagehub",
+    "license": "GPL-3.0",
     "type": "project",
-    "license": "proprietary",
     "require": {
         "php": "^7.0.8",
         "symfony/console": "^3.4",
