@@ -1,4 +1,7 @@
 {
+    "caseyamcl/phpoaipmh": {
+        "version": "v3.0"
+    },
     "paragonie/random_compat": {
         "version": "v9.99.99"
     },

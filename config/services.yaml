@@ -7,6 +7,19 @@ imports:
     - { resource: resourcespace.yaml }
 
 parameters:
+    datahub.url: 'http://datahub.box/oai'
+    datahub.namespace: 'lido'
+    datahub.metadataprefix: 'oai_lido'
+    datahub.data_definition:
+        title:
+            xpath: 'descriptiveMetadata[@xml:lang="{language}"]/objectIdentificationWrap/titleWrap/titleSet/appellationValue'
+        short_description:
+            xpath: 'descriptiveMetadata[@xml:lang="{language}"]/objectIdentificationWrap/objectDescriptionWrap/objectDescriptionSet/descriptiveNoteValue'
+        creator:
+            xpath: 'descriptiveMetadata[@xml:lang="{language}"]/eventWrap/eventSet/event[eventType/term="production"]/eventActor/actorInRole/actor/nameActorSet/appellationValue[@pref="preferred"]'
+        period:
+            xpath: 'descriptiveMetadata[@xml:lang="{language}"]/eventWrap/eventSet/event[eventType/term="production"]/periodName/term'
+
 
 services:
     # default configuration for services in *this* file
