@@ -104,12 +104,14 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
 //        $megaPixels = $exifData['MegaPixels'];
 
         $dataPid = null;
-        $newData = array('checksum' => $md5);
+        $newData = array('file_checksum' => $md5);
         foreach($this->exifFields as $key => $field) {
-            $value = $exifData[$field['exif']];
-            $newData[$field['field']] = $value;
-            if($key == 'dataPid') {
-                $dataPid = $value;
+            if(array_key_exists($field['exif'], $exifData)) {
+                $value = $exifData[$field['exif']];
+                $newData[$field['field']] = $value;
+                if ($key == 'dataPid') {
+                    $dataPid = $value;
+                }
             }
         }
 
@@ -127,15 +129,28 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
                 $xpath = new DOMXPath($domDoc);
 
                 foreach ($this->dataDefinition as $dataDef) {
-                    // TODO we probably need to support multiple languages, but how will we do this in ResourceSpace?
-                    $query = $this->buildXpath($dataDef['xpath'], 'nl');
-                    $extracted = $xpath->query($query);
+                    $xpaths = array();
+                    if(array_key_exists('xpaths', $dataDef)) {
+                        $xpaths = $dataDef['xpaths'];
+                    } else if(array_key_exists('xpath', $dataDef)) {
+                        $xpaths[] = $dataDef['xpath'];
+                    }
                     $value = null;
-                    if ($extracted) {
-                        if (count($extracted) > 0) {
-                            foreach ($extracted as $extr) {
-                                if ($extr->nodeValue !== 'n/a') {
-                                    $value = $extr->nodeValue;
+                    foreach($xpaths as $xpath_) {
+                        // TODO we probably need to support multiple languages, but how will we do this in ResourceSpace?
+                        $query = $this->buildXpath($xpath_, 'nl');
+                        $extracted = $xpath->query($query);
+                        if ($extracted) {
+                            if (count($extracted) > 0) {
+                                foreach ($extracted as $extr) {
+                                    if ($extr->nodeValue !== 'n/a') {
+                                        if($value == null) {
+                                            $value = $extr->nodeValue;
+                                        }
+                                        else {
+                                            $value .= ',' . $extr->nodeValue;
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -153,7 +168,8 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
         $createNew = true;
         foreach($this->resourceSpaceData as $id => $resourceSpaceData) {
             // Find the matching resource
-            if($resourceSpaceData['checksum'] == $newData['checksum']) {
+            var_dump($resourceSpaceData);
+            if($resourceSpaceData['file_checksum'] == $newData['file_checksum']) {
                 $createNew = false;
                 // Update fields in ResourceSpace where necessary
                 foreach($newData as $key => $value) {
@@ -187,7 +203,7 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
 
         $data = array();
         foreach($resources as $resource) {
-            $extracted = array();
+            $extracted = array('file_checksum' => $resource['file_checksum']);
             $currentData = json_decode($this->getResourceInfo($resource['ref']), true);
             foreach($currentData as $field) {
                 $extracted[$field['name']] = $field['value'];
@@ -219,7 +235,6 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
         $query = 'user=' . $this->apiUsername . '&function=update_field&param1=' . $id . '&param2=' . $key . '&param3=' . urlencode($value);
         $url = $this->apiUrl . '?' . $query . '&sign=' . $this->getSign($query);
         $data = file_get_contents($url);
-        echo $data;
         return $data;
     }
 
