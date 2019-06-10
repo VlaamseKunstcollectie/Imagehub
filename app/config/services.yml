@@ -32,6 +32,11 @@ services:
         public: true
         tags: ['controller.service_arguments']
 
+    app.command.generate_manifests_command:
+        class: AppBundle\ImageHub\Command\GenerateManifestsCommand
+        tags:
+            -  { name: console.command }
+
     # add more services, or override services that need manual wiring
     # ImageHub\Service\ExampleService:
     #     arguments:

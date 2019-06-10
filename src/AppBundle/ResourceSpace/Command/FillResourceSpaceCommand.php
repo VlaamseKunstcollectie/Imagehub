@@ -53,7 +53,7 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
 
         $supportedExtensions = $this->getContainer()->getParameter('supported_extensions');
 
-        // Make sure the API URL does not end with a ?
+        // Make sure the API URL does not end with a '?' character
         $this->apiUrl = rtrim($this->getContainer()->getParameter('api_url'), '?');
         $this->apiUsername = $this->getContainer()->getParameter('api_username');
         $this->apiKey = $this->getContainer()->getParameter('api_key');

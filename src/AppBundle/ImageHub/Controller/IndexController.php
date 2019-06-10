@@ -13,9 +13,12 @@ class IndexController extends Controller
      */
     public function indexAction(Request $request)
     {
+        $dm = $this->get('doctrine_mongodb')->getManager();
+        $count = $dm->createQueryBuilder('AppBundle\ImageHub\ManifestBundle\Document\Manifest')->count()->getQuery()->execute();
+
         // replace this example code with whatever you need
         return $this->render('index.html.twig', [
-            'documentCount' => '1337'
+            'documentCount' => $count
         ]);
     }
 }
