@@ -1,0 +1,24 @@
+# This file is a "template" of what your parameters.yml file should look like
+# Set parameters here that may be different on each deployment target of the app, e.g. development, staging, production.
+# https://symfony.com/doc/current/best_practices/configuration.html#infrastructure-related-configuration
+parameters:
+    # Name of the application as shown on the homepage
+    service_name: 'Imagehub'
+
+    # The default locale (language) of the application (available locales: en|nl)
+    locale: nl
+
+    # Email address where the admin of the application can be reached
+    service_address: 'info@vlaamsekunstcollectie.be'
+
+    # URL of the OAI-PMH endpoint for metadata harvesting
+    datahub_url: 'http://datahub.box.be/oai'
+
+    # MongoDB connection string & database
+    mongodb_server: mongodb://127.0.0.1:27017/imagehub
+    mongodb_database: imagehub
+    mongodb_user: imagehubuser
+    mongodb_password: imagehubpass
+
+    # A secret key that's used to generate certain security-related tokens
+    secret:            ThisTokenIsNotSoSecretChangeIt

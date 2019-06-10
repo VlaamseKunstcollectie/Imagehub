@@ -1,0 +1,11 @@
+# This file is auto-generated during the composer install
+parameters:
+    service_name: Imagehub
+    locale: nl
+    service_address: info@vlaamsekunstcollectie.be
+    datahub_url: 'http://datahub.box.be/oai'
+    mongodb_server: 'mongodb://127.0.0.1:27017/imagehub'
+    mongodb_database: imagehub
+    mongodb_user: imagehubuser
+    mongodb_password: imagehubpass
+    secret: ThisTokenIsNotSoSecretChangeIt
