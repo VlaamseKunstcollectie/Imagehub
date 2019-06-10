@@ -1,6 +1,6 @@
 # This file is auto-generated during the composer install
 parameters:
-    service_name: Imagehub
+    service_name: ImageHub
     locale: nl
     service_address: info@vlaamsekunstcollectie.be
     datahub_url: 'http://datahub.box.be/oai'

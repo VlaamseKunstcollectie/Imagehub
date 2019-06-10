@@ -3,6 +3,7 @@
 /.env.local
 /.env.local.php
 /.env.*.local
+/node_modules/
 /public/bundles/
 /var/
 /vendor/
