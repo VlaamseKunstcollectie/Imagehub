@@ -5,7 +5,7 @@ parameters:
 
     exif_fields:
         # dataPid is required to fetch the relevant record from the Datahub
-        dataPid:
+        data_pid:
             exif: 'ImageDescription'
             field: 'pidafbeelding'
         # originalfilename is required to find the matching resource in ResourceSpace
@@ -16,15 +16,27 @@ parameters:
         camera:
             exif: 'Model'
             field: 'camera'
-        mimeType:
+        mime_type:
             exif: 'MimeType'
             field: 'digitalsourcetype'
-        fileSize:
+        file_size:
             exif: 'FileSize'
             field: 'videosize'
-        workPid:
+        work_pid:
             exif: 'DocumentName'
             field: 'pidobject'
+        right_usage_terms:
+            exif: 'Copyright'
+            field: 'rightusageterms'
+        creator_of_image:
+            exif: 'Artist'
+            field: 'creatorofimage'
+        credit_line:
+            exif: 'Artist'
+            field: 'creditline'
+        date_created:
+            exif: 'DateTimeOriginal'
+            field: 'datecreatedofimage'
 
     api_url: 'http://resourcespace.box/api'
     api_username: 'admin'

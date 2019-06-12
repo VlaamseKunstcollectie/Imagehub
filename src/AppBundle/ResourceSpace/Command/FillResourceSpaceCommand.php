@@ -89,6 +89,8 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
     {
         $md5 = md5_file($image);
         $exifData = exif_read_data($image);
+        var_dump($exifData);
+        exit();
 
         $dataPid = null;
         $newData = array();
@@ -96,7 +98,7 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
             if(array_key_exists($field['exif'], $exifData)) {
                 $value = $exifData[$field['exif']];
                 $newData[$field['field']] = $value;
-                if ($key == 'dataPid') {
+                if ($key == 'data_pid') {
                     $dataPid = $value;
                 }
             }
