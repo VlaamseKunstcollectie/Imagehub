@@ -89,8 +89,6 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
     {
         $md5 = md5_file($image);
         $exifData = exif_read_data($image);
-        var_dump($exifData);
-        exit();
 
         $dataPid = null;
         $newData = array();
@@ -182,7 +180,7 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
             }
         }
         if($createNew) {
-            $result = $this->importIntoResourceSpace(realpath($image), $newData);
+            $result = $this->uploadToResourceSpace(realpath($image), $newData);
             //TODO log the result if something went wrong
         }
     }
@@ -215,9 +213,9 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
         return $data;
     }
 
-    protected function importIntoResourceSpace($image, $newData)
+    protected function uploadToResourceSpace($image, $newData)
     {
-        $query = 'user=' . $this->apiUsername . '&function=create_resource&param1=1&param2=0&param3=' . urlencode($image) . '&param4=true&param5=&param6=&param7=' . urlencode(json_encode($newData));
+        $query = 'user=' . $this->apiUsername . '&function=create_resource&param1=1&param2=0&param3=' . urlencode($image) . '&param4=1&param5=&param6=&param7=' . urlencode(json_encode($newData));
         $url = $this->apiUrl . '?' . $query . '&sign=' . $this->getSign($query);
         $data = file_get_contents($url);
         return $data;
