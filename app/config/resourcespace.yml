@@ -4,12 +4,18 @@ parameters:
         - tif
 
     exif_fields:
+        # dataPid is required to fetch the relevant record from the Datahub
+        dataPid:
+            exif: 'ImageDescription'
+            field: 'pidafbeelding'
+        # originalfilename is required to find the matching resource in ResourceSpace
+        originalfilename:
+            exif: 'FileName'
+            field: 'originalfilename'
+        # All other fields are optional
         camera:
             exif: 'Model'
             field: 'camera'
-        filename:
-            exif: 'FileName'
-            field: 'originalfilename'
         mimeType:
             exif: 'MimeType'
             field: 'digitalsourcetype'
@@ -19,16 +25,13 @@ parameters:
         workPid:
             exif: 'DocumentName'
             field: 'pidobject'
-        # dataPid is required to fetch the relevant record from the Datahub
-        dataPid:
-            exif: 'ImageDescription'
-            field: 'pidafbeelding'
 
     api_url: 'http://resourcespace.box/api'
     api_username: 'admin'
     api_key: 'a63be2826ee346f6ef7bafc06d9aef642e007a213214fd8624eebbd0818adac2'
 
     datahub.url: 'http://datahub.box/oai'
+    datahub.language: 'nl'
     datahub.namespace: 'lido'
     datahub.metadataprefix: 'oai_lido'
     datahub.data_definition:

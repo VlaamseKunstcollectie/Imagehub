@@ -17,6 +17,7 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
     private $apiKey;
     private $resourceSpaceData;
     private $datahubUrl;
+    private $datahubLanguage;
     private $namespace;
     private $metadataPrefix;
     private $dataDefinition;
@@ -43,6 +44,7 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
         if(!$this->datahubUrl) {
             $this->datahubUrl = $this->getContainer()->getParameter('datahub.url');
         }
+        $this->datahubLanguage = $this->getContainer()->getParameter('datahub.language');
         $this->namespace = $this->getContainer()->getParameter('datahub.namespace');
         $this->metadataPrefix = $this->getContainer()->getParameter('datahub.metadataprefix');
         $this->dataDefinition = $this->getContainer()->getParameter('datahub.data_definition');
@@ -88,23 +90,8 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
         $md5 = md5_file($image);
         $exifData = exif_read_data($image);
 
-        // The fields that we're interested in, for future reference
-/*        $workPid = $exifData['DocumentName'];
-        $dataPid = $exifData['ImageDescription'];
-        $fileName = $exifData['FileName'];
-        $mimeType = $exifData['MimeType'];
-        $photographer = $exifData['Artist'];
-        $copyright = $exifData['Copyright'];
-        $imageWidth = $exifData['ImageWidth'];
-        $imageHeight = $exifData['ImageLength'];
-        $dateTime = $exifData['DateTime'];*/
-
-        // These fields don't seem to exist
-//        $description = $exifData['Description'];
-//        $megaPixels = $exifData['MegaPixels'];
-
         $dataPid = null;
-        $newData = array('file_checksum' => $md5);
+        $newData = array();
         foreach($this->exifFields as $key => $field) {
             if(array_key_exists($field['exif'], $exifData)) {
                 $value = $exifData[$field['exif']];
@@ -137,8 +124,7 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
                     }
                     $value = null;
                     foreach($xpaths as $xpath_) {
-                        // TODO we probably need to support multiple languages, but how will we do this in ResourceSpace?
-                        $query = $this->buildXpath($xpath_, 'nl');
+                        $query = $this->buildXpath($xpath_, $this->datahubLanguage);
                         $extracted = $xpath->query($query);
                         if ($extracted) {
                             if (count($extracted) > 0) {
@@ -168,9 +154,14 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
         $createNew = true;
         foreach($this->resourceSpaceData as $id => $resourceSpaceData) {
             // Find the matching resource
-            var_dump($resourceSpaceData);
-            if($resourceSpaceData['file_checksum'] == $newData['file_checksum']) {
+            if($resourceSpaceData['originalfilename'] == $newData['originalfilename']) {
                 $createNew = false;
+
+                // Re-upload the file if the checksums don't match
+                if($resourceSpaceData['file_checksum'] != $md5) {
+                    $this->replaceResourceSpaceFile($id, realpath($image));
+                }
+
                 // Update fields in ResourceSpace where necessary
                 foreach($newData as $key => $value) {
                     $update = false;
@@ -224,7 +215,7 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
 
     protected function importIntoResourceSpace($image, $newData)
     {
-        $query = 'user=' . $this->apiUsername . '&function=create_resource&param1=1&param2=0&param3=' . urlencode($image) . '&param4=&param5=&param6=&param7=' . urlencode(json_encode($newData));
+        $query = 'user=' . $this->apiUsername . '&function=create_resource&param1=1&param2=0&param3=' . urlencode($image) . '&param4=true&param5=&param6=&param7=' . urlencode(json_encode($newData));
         $url = $this->apiUrl . '?' . $query . '&sign=' . $this->getSign($query);
         $data = file_get_contents($url);
         return $data;
@@ -233,6 +224,14 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
     protected function updateResourceSpaceField($id, $key, $value)
     {
         $query = 'user=' . $this->apiUsername . '&function=update_field&param1=' . $id . '&param2=' . $key . '&param3=' . urlencode($value);
+        $url = $this->apiUrl . '?' . $query . '&sign=' . $this->getSign($query);
+        $data = file_get_contents($url);
+        return $data;
+    }
+
+    protected function replaceResourceSpaceFile($id, $image)
+    {
+        $query = 'user=' . $this->apiUsername . '&function=upload_file&param1=' . $id . '&param2=true&param3=&param4=&param5=' . urlencode($image);
         $url = $this->apiUrl . '?' . $query . '&sign=' . $this->getSign($query);
         $data = file_get_contents($url);
         return $data;
