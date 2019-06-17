@@ -3,6 +3,7 @@ namespace AppBundle\ResourceSpace\Command;
 
 use DOMDocument;
 use DOMXPath;
+use Exception;
 use Imagick;
 use ImagickException;
 use Phpoaipmh\Endpoint;
@@ -72,20 +73,25 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
         // Loop through all files in the folder
         $imageFiles = scandir($folder);
         foreach ($imageFiles as $imageFile) {
-            $info = pathinfo($imageFile);
-            $isSupportedImage = false;
+            try {
+                $info = pathinfo($imageFile);
+                $isSupportedImage = false;
 
-            // Check if the file is in (one of) the supported format(s)
-            foreach ($supportedExtensions as $supportedExtension) {
-                if ($info['extension'] == $supportedExtension) {
-                    $isSupportedImage = true;
-                    break;
+                // Check if the file is in (one of) the supported format(s)
+                foreach ($supportedExtensions as $supportedExtension) {
+                    if ($info['extension'] == $supportedExtension) {
+                        $isSupportedImage = true;
+                        break;
+                    }
+                }
+                if ($isSupportedImage) {
+                    $this->processImage($folder . $imageFile);
+                } else {
+                    // TODO log incorrect file extension
                 }
             }
-            if ($isSupportedImage) {
-                $this->processImage($folder. $imageFile);
-            } else {
-                // TODO log incorrect file extension
+            catch(Exception $e) {
+                echo $e . PHP_EOL;
             }
         }
     }
