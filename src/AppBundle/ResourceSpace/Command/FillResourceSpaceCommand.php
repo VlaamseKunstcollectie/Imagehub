@@ -3,6 +3,8 @@ namespace AppBundle\ResourceSpace\Command;
 
 use DOMDocument;
 use DOMXPath;
+use Imagick;
+use ImagickException;
 use Phpoaipmh\Endpoint;
 use Phpoaipmh\Exception\OaipmhException;
 use Symfony\Bundle\FrameworkBundle\Command\ContainerAwareCommand;
@@ -62,6 +64,9 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
 
 
         $this->resourceSpaceData = $this->getCurrentResourceSpaceData();
+        if($this->resourceSpaceData === NULL) {
+            return;
+        }
 
 
         // Loop through all files in the folder
@@ -87,7 +92,25 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
 
     protected function processImage($image)
     {
-        $md5 = md5_file($image);
+        $jpegImage = substr($image, 0, strrpos($image, '.')) . '.jpg';
+
+        $imageDimensions = getimagesize($image);
+        $imageWidth = $imageDimensions[0];
+        $imageHeight = $imageDimensions[1];
+        try {
+            $imagick = new Imagick($image);
+            $maxDimension = $this->getContainer()->getParameter('scale_image_pixels');
+            if($imageWidth > $maxDimension || $imageHeight > $maxDimension) {
+                $imagick->scaleImage($imageWidth >= $imageHeight ? $maxDimension : 0, $imageWidth < $imageHeight ? $maxDimension : 0);
+            }
+            $imagick->setFormat('jpeg');
+            $imagick->writeImage($jpegImage);
+        } catch (ImagickException $e) {
+            echo $e . PHP_EOL;
+        }
+
+
+        $md5 = md5_file($jpegImage);
         $exifData = exif_read_data($image);
 
         $dataPid = null;
@@ -159,7 +182,7 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
 
                 // Re-upload the file if the checksums don't match
                 if($resourceSpaceData['file_checksum'] != $md5) {
-                    $this->replaceResourceSpaceFile($id, realpath($image));
+                    $this->replaceResourceSpaceFile($id, realpath($jpegImage));
                 }
 
                 // Update fields in ResourceSpace where necessary
@@ -180,9 +203,15 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
             }
         }
         if($createNew) {
-            $result = $this->uploadToResourceSpace(realpath($image), $newData);
+            $newId = $this->uploadToResourceSpace(realpath($jpegImage));
+            foreach($newData as $key => $value) {
+                $this->updateResourceSpaceField($newId, $key, $value);
+            }
             //TODO log the result if something went wrong
         }
+
+        // Delete the JPEG image we created
+        unlink($jpegImage);
     }
 
     protected function getCurrentResourceSpaceData()
@@ -190,6 +219,12 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
         $query = 'user=' . $this->apiUsername . '&function=do_search&param1=';
         $url = $this->apiUrl . '?' . $query . '&sign=' . $this->getSign($query);
         $allResources = file_get_contents($url);
+
+        if($allResources == 'Invalid signature') {
+            echo 'Error: invalid ResourceSpace API key. Please paste the key found in the ResourceSpace user management into app/config/resourcespace.yml.' . PHP_EOL;
+            return NULL;
+        }
+
         $resources = json_decode($allResources, true);
 
         $data = array();
@@ -213,9 +248,9 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
         return $data;
     }
 
-    protected function uploadToResourceSpace($image, $newData)
+    protected function uploadToResourceSpace($image)
     {
-        $query = 'user=' . $this->apiUsername . '&function=create_resource&param1=1&param2=0&param3=' . urlencode($image) . '&param4=1&param5=&param6=&param7=' . urlencode(json_encode($newData));
+        $query = 'user=' . $this->apiUsername . '&function=create_resource&param1=1&param2=0&param3=' . urlencode($image) . '&param4=1&param5=&param6=&param7=';
         $url = $this->apiUrl . '?' . $query . '&sign=' . $this->getSign($query);
         $data = file_get_contents($url);
         return $data;

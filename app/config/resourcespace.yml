@@ -2,6 +2,7 @@ parameters:
     images_folder: '../images/'
     supported_extensions:
         - tif
+    scale_image_pixels: 1800
 
     exif_fields:
         # dataPid is required to fetch the relevant record from the Datahub
@@ -40,7 +41,7 @@ parameters:
 
     api_url: 'http://resourcespace.box/api'
     api_username: 'admin'
-    api_key: 'a63be2826ee346f6ef7bafc06d9aef642e007a213214fd8624eebbd0818adac2'
+    api_key: 'c6a63246c4926250779b42ec4fd24b7c0001ec42fa71d25b4748b2361a4e4579'
 
     datahub.url: 'http://datahub.box/oai'
     datahub.language: 'nl'
