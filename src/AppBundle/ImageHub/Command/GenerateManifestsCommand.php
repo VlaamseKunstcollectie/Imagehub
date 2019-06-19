@@ -52,43 +52,8 @@ class GenerateManifestsCommand extends ContainerAwareCommand
         $dm = $this->getContainer()->get('doctrine_mongodb')->getManager();
         $dm->getDocumentCollection('ManifestBundle:Manifest')->remove([]);
 
-        $query = 'user=' . $this->apiUsername . '&function=do_search&param1=';
-        $url = $this->apiUrl . '?' . $query . '&sign=' . $this->getSign($query);
-        $allResources = file_get_contents($url);
-        $resources = json_decode($allResources, true);
-
-        $imageData = array();
-        foreach($resources as $resource) {
-            $currentData = $this->getResourceInfo($resource['ref']);
-            $newResourceSpaceData = array();
-            $dataPid = null;
-            foreach($currentData as $data) {
-                if($data->name == 'pidafbeelding') {
-                    $newResourceSpaceData['data_pid'] = $data->value;
-                    $dataPid = $data->value;
-                } else if($data->name == 'originalfilename') {
-                    $dotPos = strrpos($data->value, '.');
-                    $newResourceSpaceData['image_id'] = $dotPos > 0 ? substr($data->value, 0, $dotPos) : $data->value;
-                }
-            }
-
-            // Add related works if this dataPid is already present in the image data
-            if(array_key_exists($dataPid, $imageData)) {
-                $newResourceSpaceData = array('relatedworktype' => 'relatedto') + $newResourceSpaceData;
-                if(array_key_exists('relatedworks', $imageData[$dataPid])) {
-                    $imageData[$dataPid]['relatedworks'][] = $newResourceSpaceData;
-                } else {
-                    $imageData[$dataPid]['relatedworks'] = array($newResourceSpaceData);
-                }
-            } else {
-                $imageData[$dataPid] = $newResourceSpaceData;
-            }
-        }
+        $imageData = $this->getResourceSpaceData();
         var_dump($imageData);
-
-
-
-
 
 /*        $manifestDocument = new Manifest();
         $manifestDocument->setData($currentData);
@@ -124,4 +89,42 @@ class GenerateManifestsCommand extends ContainerAwareCommand
         $xpath = 'descendant::' . $xpath;
         return $xpath;
     }
+
+    private function getResourceSpaceData()
+    {
+        $query = 'user=' . $this->apiUsername . '&function=do_search&param1=';
+        $url = $this->apiUrl . '?' . $query . '&sign=' . $this->getSign($query);
+        $allResources = file_get_contents($url);
+        $resources = json_decode($allResources, true);
+
+        $imageData = array();
+        foreach($resources as $resource) {
+            $currentData = $this->getResourceInfo($resource['ref']);
+            $newResourceSpaceData = array();
+            $dataPid = null;
+            foreach($currentData as $data) {
+                if($data->name == 'pidafbeelding') {
+                    $newResourceSpaceData['data_pid'] = $data->value;
+                    $dataPid = $data->value;
+                } else if($data->name == 'originalfilename') {
+                    $dotPos = strrpos($data->value, '.');
+                    $newResourceSpaceData['image_id'] = $dotPos > 0 ? substr($data->value, 0, $dotPos) : $data->value;
+                }
+            }
+
+            // Add related works if this dataPid is already present in the image data
+            if(array_key_exists($dataPid, $imageData)) {
+                $newResourceSpaceData = array('relatedworktype' => 'relatedto') + $newResourceSpaceData;
+                if(array_key_exists('relatedworks', $imageData[$dataPid])) {
+                    $imageData[$dataPid]['relatedworks'][] = $newResourceSpaceData;
+                } else {
+                    $imageData[$dataPid]['relatedworks'] = array($newResourceSpaceData);
+                }
+            } else {
+                $imageData[$dataPid] = $newResourceSpaceData;
+            }
+        }
+        return $imageData;
+    }
+
 }
