@@ -57,16 +57,44 @@ class GenerateManifestsCommand extends ContainerAwareCommand
         $allResources = file_get_contents($url);
         $resources = json_decode($allResources, true);
 
+        $imageData = array();
         foreach($resources as $resource) {
-            //TODO properly generate manifests
             $currentData = $this->getResourceInfo($resource['ref']);
+            $newResourceSpaceData = array();
+            $dataPid = null;
+            foreach($currentData as $data) {
+                if($data->name == 'pidafbeelding') {
+                    $newResourceSpaceData['data_pid'] = $data->value;
+                    $dataPid = $data->value;
+                } else if($data->name == 'originalfilename') {
+                    $dotPos = strrpos($data->value, '.');
+                    $newResourceSpaceData['image_id'] = $dotPos > 0 ? substr($data->value, 0, $dotPos) : $data->value;
+                }
+            }
 
-            $manifestDocument = new Manifest();
-            $manifestDocument->setData($currentData);
-            $dm->persist($manifestDocument);
-            $dm->flush();
-            $dm->clear();
+            // Add related works if this dataPid is already present in the image data
+            if(array_key_exists($dataPid, $imageData)) {
+                $newResourceSpaceData = array('relatedworktype' => 'relatedto') + $newResourceSpaceData;
+                if(array_key_exists('relatedworks', $imageData[$dataPid])) {
+                    $imageData[$dataPid]['relatedworks'][] = $newResourceSpaceData;
+                } else {
+                    $imageData[$dataPid]['relatedworks'] = array($newResourceSpaceData);
+                }
+            } else {
+                $imageData[$dataPid] = $newResourceSpaceData;
+            }
         }
+        var_dump($imageData);
+
+
+
+
+
+/*        $manifestDocument = new Manifest();
+        $manifestDocument->setData($currentData);
+        $dm->persist($manifestDocument);
+        $dm->flush();
+        $dm->clear();*/
     }
 
     private function getResourceInfo($id)
@@ -74,7 +102,7 @@ class GenerateManifestsCommand extends ContainerAwareCommand
         $query = 'user=' . $this->apiUsername . '&function=get_resource_field_data&param1=' . $id;
         $url = $this->apiUrl . '?' . $query . '&sign=' . $this->getSign($query);
         $data = file_get_contents($url);
-        return $data;
+        return json_decode($data);
     }
 
     private function getSign($query)
