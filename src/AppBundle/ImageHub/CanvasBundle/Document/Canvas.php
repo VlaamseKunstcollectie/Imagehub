@@ -1,13 +1,13 @@
 <?php
 
-namespace AppBundle\ImageHub\ManifestBundle\Document;
+namespace AppBundle\ImageHub\CanvasBundle\Document;
 
 use Doctrine\ODM\MongoDB\Mapping\Annotations as ODM;
 
 /**
- * @ODM\Document(collection="manifest")
+ * @ODM\Document(collection="canvas")
  */
-class Manifest
+class Canvas
 {
     /**
      * @ODM\Id
@@ -17,7 +17,7 @@ class Manifest
     /**
      * @ODM\Field(type="string")
      */
-    private $manifestId;
+    private $canvasId;
 
     /**
      * @ODM\Field(type="string")
@@ -34,14 +34,14 @@ class Manifest
         $this->id = $id;
     }
 
-    public function getManifestId()
+    public function getCanvasId()
     {
-        return $this->manifestId;
+        return $this->canvasId;
     }
 
-    public function setManifestId($manifestId)
+    public function setCanvasId($canvasId)
     {
-        $this->manifestId = $manifestId;
+        $this->canvasId = $canvasId;
     }
 
     public function getData()

@@ -1,6 +1,7 @@
 <?php
 namespace AppBundle\ImageHub\Command;
 
+use AppBundle\ImageHub\CanvasBundle\Document\Canvas;
 use AppBundle\ImageHub\ManifestBundle\Document\Manifest;
 use Couchbase\Document;
 use DOMDocument;
@@ -60,23 +61,22 @@ class GenerateManifestsCommand extends ContainerAwareCommand
 
         $this->cantaloupeUrl = $this->getContainer()->getParameter('cantaloupe_url');
 
-        $this->generateAndStoreManifests();
+        $this->generateManifests();
     }
 
-    private function generateAndStoreManifests()
+    private function generateManifests()
     {
 
         $dm = $this->getContainer()->get('doctrine_mongodb')->getManager();
         $dm->getDocumentCollection('ManifestBundle:Manifest')->remove([]);
+        $dm->getDocumentCollection('CanvasBundle:Canvas')->remove([]);
 
         $imageData = $this->getResourceSpaceData();
         $this->addCantaloupeData($imageData);
         $this->addDatahubData($imageData);
         $this->addAllRelations($imageData);
         $this->addArthubRelations($imageData);
-        $manifests = $this->generateManifests($imageData);
-        $this->storeManifests($manifests, $dm);
-
+        $this->generateAndStoreManifests($imageData, $dm);
     }
 
     private function getResourceInfo($id)
@@ -384,7 +384,7 @@ class GenerateManifestsCommand extends ContainerAwareCommand
         }
     }
 
-    private function generateManifests($imageData)
+    private function generateAndStoreManifests($imageData, $dm)
     {
         $manifests = array();
         foreach($imageData as $dataPid => $value) {
@@ -443,7 +443,7 @@ class GenerateManifestsCommand extends ContainerAwareCommand
                     'resource'   => $resource,
                     'on'         => $canvasId
                 );
-                $canvases[] = array(
+                $newCanvas = array(
                     '@id'    => $canvasId,
                     '@type'  => 'sc:Canvas',
                     'label'  => $canvas['image_id'],
@@ -451,6 +451,13 @@ class GenerateManifestsCommand extends ContainerAwareCommand
                     'width'  => $canvas['width'],
                     'images' => array($image)
                 );
+                $canvases[] = $newCanvas;
+
+                // Store the canvas in mongodb
+                $canvasDocument = new Canvas();
+                $canvasDocument->setCanvasId($canvasId);
+                $canvasDocument->setData(json_encode($newCanvas));
+                $dm->persist($canvasDocument);
             }
 
             // Fill in sequence data
@@ -460,12 +467,13 @@ class GenerateManifestsCommand extends ContainerAwareCommand
                 'canvases' => $canvases
             );
 
+            $manifestId = 'https://imagehub.vlaamsekunstcollectie.be/iiif/2/' . $value['manifest_id'] . '/manifest';
             // Generate the whole manifest
             $manifest = array(
                 '@context'         => 'http://iiif.io/api/presentation/2/context.json',
                 '@type'            => 'sc:Manifest',
                 // TODO with or without preceding https://? example manifest and ETL5 documentation give 2 different results
-                '@id'              => 'https://imagehub.vlaamsekunstcollectie.be/iiif/2/' . $value['manifest_id'] . '/manifest',
+                '@id'              => $manifestId,
                 'label'            => $value['label'],
                 'attribution'      => $value['attribution'],
                 'related'          => $value['related'],
@@ -476,21 +484,15 @@ class GenerateManifestsCommand extends ContainerAwareCommand
                 'sequences'        => array($manifestSequence)
             );
 
-            $manifests[$value['manifest_id']] = json_encode($manifest);
-        }
-
-        return $manifests;
-    }
-
-    private function storeManifests($manifests, $dm)
-    {
-        foreach($manifests as $manifestId => $manifest) {
+            // Store the manifest in mongodb
             $manifestDocument = new Manifest();
             $manifestDocument->setManifestId($manifestId);
-            $manifestDocument->setData($manifest);
+            $manifestDocument->setData(json_encode($manifest));
             $dm->persist($manifestDocument);
             $dm->flush();
             $dm->clear();
         }
+
+        return $manifests;
     }
 }
