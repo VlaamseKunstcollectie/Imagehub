@@ -3,13 +3,10 @@ namespace AppBundle\ImageHub\Command;
 
 use AppBundle\ImageHub\CanvasBundle\Document\Canvas;
 use AppBundle\ImageHub\ManifestBundle\Document\Manifest;
-use Couchbase\Document;
 use DOMDocument;
 use DOMXPath;
 use Exception;
 use Phpoaipmh\Endpoint;
-use Phpoaipmh\Exception\OaipmhException;
-use Stubs\DocumentManager;
 use Symfony\Bundle\FrameworkBundle\Command\ContainerAwareCommand;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
@@ -124,7 +121,9 @@ class GenerateManifestsCommand extends ContainerAwareCommand
                 'description'   => '',
                 'data_pid'      => 'oai:datahub.vlaamsekunstcollectie.be:kmska.be:523-525bis',
                 'related_works' => array(),
-                'sort_order'    => 1
+                'sort_order'    => 1,
+                'height'        => 0,
+                'width'         => 0
             );
 
             $dataPid = null;
