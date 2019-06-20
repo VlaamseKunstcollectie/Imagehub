@@ -119,7 +119,7 @@ class GenerateManifestsCommand extends ContainerAwareCommand
                 'attribution'   => '',
                 'related'       => '',
                 'description'   => '',
-                'data_pid'      => 'oai:datahub.vlaamsekunstcollectie.be:kmska.be:523-525bis',
+                'data_pid'      => '',
                 'related_works' => array(),
                 'sort_order'    => 1,
                 'height'        => 0,
