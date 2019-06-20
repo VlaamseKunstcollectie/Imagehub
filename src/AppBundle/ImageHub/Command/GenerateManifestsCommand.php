@@ -74,7 +74,6 @@ class GenerateManifestsCommand extends ContainerAwareCommand
         $this->addDatahubData($imageData);
         $this->addAllRelations($imageData);
         $this->addArthubRelations($imageData);
-//        var_dump($imageData);
         $manifests = $this->generateManifests($imageData);
         $this->storeManifests($manifests, $dm);
 
@@ -116,65 +115,6 @@ class GenerateManifestsCommand extends ContainerAwareCommand
         $resources = json_decode($allResources, true);
 
         $imageData = array();
-        // Test data
-        $imageData = array(
-            'oai:datahub.vlaamsekunstcollectie.be:kmska.be:523' =>
-            array(
-                'label'         => 'derp',
-                'attribution'   => 'MSK',
-                'related'       => 'arthub ID',
-                'description'   => 'a description',
-                'data_pid'      => 'oai:datahub.vlaamsekunstcollectie.be:kmska.be:523',
-                'image_id'      => '1000006969.tif',
-                'related_works' => array(),
-                'sort_order'    => 2,
-                'manifest_id'   => 'kmksa.be:523',
-                'height'        => 1337,
-                'width'         => 69
-            ),
-            'oai:datahub.vlaamsekunstcollectie.be:kmska.be:524' =>
-                array(
-                    'label'         => 'derp',
-                    'attribution'   => 'MSK',
-                    'related'       => 'arthub ID',
-                    'description'   => 'a description',
-                    'data_pid'      => 'oai:datahub.vlaamsekunstcollectie.be:kmska.be:524',
-                    'image_id'      => '1000006970.tif',
-                    'related_works' => array(),
-                    'sort_order'    => 3,
-                    'manifest_id'   => 'kmksa.be:524',
-                    'height'        => 1337,
-                    'width'         => 69
-                ),
-            'oai:datahub.vlaamsekunstcollectie.be:kmska.be:525' =>
-                array(
-                    'label'         => 'derp',
-                    'attribution'   => 'MSK',
-                    'related'       => 'arthub ID',
-                    'description'   => 'a description',
-                    'data_pid'      => 'oai:datahub.vlaamsekunstcollectie.be:kmska.be:525',
-                    'image_id'      => '1000006971.tif',
-                    'related_works' => array(),
-                    'sort_order'    => 4,
-                    'manifest_id'   => 'kmksa.be:525',
-                    'height'        => 1337,
-                    'width'         => 69
-                ),
-            'oai:datahub.vlaamsekunstcollectie.be:kmska.be:525bis' =>
-                array(
-                    'label'         => 'derp',
-                    'attribution'   => 'MSK',
-                    'related'       => 'arthub ID',
-                    'description'   => 'a description',
-                    'data_pid'      => 'oai:datahub.vlaamsekunstcollectie.be:kmska.be:525bis',
-                    'image_id'      => '1000006972.tif',
-                    'related_works' => array(),
-                    'sort_order'    => 5,
-                    'manifest_id'   => 'kmksa.be:525bis',
-                    'height'        => 1337,
-                    'width'         => 69
-                )
-        );
         foreach($resources as $resource) {
             $currentData = $this->getResourceInfo($resource['ref']);
             $newResourceSpaceData = array(
@@ -188,14 +128,10 @@ class GenerateManifestsCommand extends ContainerAwareCommand
             );
 
             $dataPid = null;
-            // Test data
-//            $dataPid = 'oai:datahub.vlaamsekunstcollectie.be:mskgent.be:1903-L';
-            $dataPid = 'oai:datahub.vlaamsekunstcollectie.be:kmska.be:523-525bis';
-//            $newResourceSpaceData['data_pid'] = $dataPid;
             foreach($currentData as $data) {
                 if($data->name == 'pidafbeelding') {
-//                    $newResourceSpaceData['data_pid'] = $data->value;// TODO uncomment
-//                    $dataPid = $data->value;// TODO uncomment
+                    $newResourceSpaceData['data_pid'] = $data->value;
+                    $dataPid = $data->value;
                 } else if($data->name == 'originalfilename') {
                     // TODO image ID with or without extension?
                     // With extension
@@ -539,7 +475,6 @@ class GenerateManifestsCommand extends ContainerAwareCommand
                 'viewingHint'      => 'individuals',
                 'sequences'        => array($manifestSequence)
             );
-//            var_dump(json_encode($manifest,JSON_PRETTY_PRINT));
 
             $manifests[$value['manifest_id']] = json_encode($manifest);
         }
