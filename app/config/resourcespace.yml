@@ -3,6 +3,7 @@ parameters:
     supported_extensions:
         - tif
     scale_image_pixels: 1800
+    cantaloupe_url: 'http://imagehub.box/iiif/2/'
 
     exif_fields:
         # dataPid is required to fetch the relevant record from the Datahub
@@ -43,26 +44,42 @@ parameters:
     api_username: 'admin'
     api_key: 'c6a63246c4926250779b42ec4fd24b7c0001ec42fa71d25b4748b2361a4e4579'
 
+    datahub.languages:
+        - nl
+        - en
     datahub.url: 'http://datahub.box/oai'
     datahub.language: 'nl'
     datahub.namespace: 'lido'
     datahub.metadataprefix: 'oai_lido'
     datahub.data_definition:
-        publisher:
-            xpath: 'administrativeMetadata[@xml:lang="{language}"]/recordWrap/recordSource/legalBodyName/appellationValue'
-            field: 'publisher'
         title:
             xpath: 'descriptiveMetadata[@xml:lang="{language}"]/objectIdentificationWrap/titleWrap/titleSet/appellationValue'
             field: 'titleofartworkobject'
+            label: 'Title'
         short_description:
             xpath: 'descriptiveMetadata[@xml:lang="{language}"]/objectIdentificationWrap/objectDescriptionWrap/objectDescriptionSet/descriptiveNoteValue'
             field: 'description'
         creator:
             xpath: 'descriptiveMetadata[@xml:lang="{language}"]/eventWrap/eventSet/event[eventType/term="production"]/eventActor/actorInRole/actor/nameActorSet/appellationValue[@pref="preferred"]'
             field: 'creatorofartworkobje'
+            label: 'Artist'
         period:
             xpath: 'descriptiveMetadata[@xml:lang="{language}"]/eventWrap/eventSet/event[eventType/term="production"]/periodName/term'
             field: 'work-period'
+            label: 'Period'
+        date:
+            xpath: 'descriptiveMetadata[@xml:lang="{language}"]/eventWrap/eventSet/event[eventType/term="production"]/eventDate/displayDate'
+            label: 'Date'
+        earliest_date:
+            xpath: 'descriptiveMetadata[@xml:lang="{language}"]/eventWrap/eventSet/event[eventType/term="production"]/eventDate/date/earliestDate'
+            label: 'EarliestDate'
+        latest_date:
+            xpath: 'descriptiveMetadata[@xml:lang="{language}"]/eventWrap/eventSet/event[eventType/term="production"]/eventDate/date/latestDate'
+            label: 'LatestDate'
+        publisher:
+            xpath: 'administrativeMetadata[@xml:lang="{language}"]/recordWrap/recordSource/legalBodyName/appellationValue'
+            field: 'publisher'
+            label: 'Credit Line'
         keywords:
             xpaths:
               - 'descriptiveMetadata[@xml:lang="{language}"]/objectClassificationWrap/objectWorkTypeWrap/objectWorkType/conceptID[@source="AAT"]'

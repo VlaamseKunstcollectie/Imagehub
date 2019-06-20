@@ -17,6 +17,11 @@ class Manifest
     /**
      * @ODM\Field(type="string")
      */
+    private $manifestId;
+
+    /**
+     * @ODM\Field(type="string")
+     */
     private $data;
 
     public function getId()
@@ -27,6 +32,16 @@ class Manifest
     public function setId($id)
     {
         $this->id = $id;
+    }
+
+    public function getManifestId()
+    {
+        return $this->manifestId;
+    }
+
+    public function setManifestId($manifestId)
+    {
+        $this->manifestId = $manifestId;
     }
 
     public function getData()

@@ -145,6 +145,9 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
                 $xpath = new DOMXPath($domDoc);
 
                 foreach ($this->dataDefinition as $dataDef) {
+                    if(!array_key_exists('field', $dataDef)) {
+                        continue;
+                    }
                     $xpaths = array();
                     if(array_key_exists('xpaths', $dataDef)) {
                         $xpaths = $dataDef['xpaths'];
