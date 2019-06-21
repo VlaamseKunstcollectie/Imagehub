@@ -4,17 +4,26 @@ namespace AppBundle\ImageHub\Controller;
 
 use Symfony\Bundle\FrameworkBundle\Controller\Controller;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
 
 class ManifestController extends Controller
 {
     /**
-     * @Route("/iiif/2/{manifestId}/manifest", name="manifest")
+     * @Route("/iiif/2/{manifestId}/manifest.json", name="mani")
      */
-    public function getManifest(Request $request, $manifestId = '')
+    public function manifestAction(Request $request, $manifestId = '')
     {
         $dm = $this->get('doctrine_mongodb')->getManager();
-        $manifest = $dm->createQueryBuilder('AppBundle\ImageHub\ManifestBundle\Document\Manifest')->field('manifestId')->equals('https://imagehub.vlaamsekunstcollectie.be/iiif/2/' . $manifestId . '/manifest');
-        echo $manifest;
+        $manifests = $dm->createQueryBuilder('AppBundle\ImageHub\ManifestBundle\Document\Manifest')->field('manifestId')->equals($this->getParameter('service_url') . $manifestId . '/manifest.json')->getQuery()->execute();
+        $toServe = 'Sorry, the requested document does not exist.';
+        if(count($manifests) > 0) {
+            foreach($manifests as $manifest) {
+                $toServe = $manifest->getData();
+            }
+            return new Response(json_encode(json_decode($toServe), JSON_PRETTY_PRINT + JSON_UNESCAPED_SLASHES + JSON_UNESCAPED_UNICODE), 200, array('Content-Type' => 'application/json'));
+        } else {
+            return new Response('Sorry, the requested document does not exist.', 404);
+        }
     }
 }

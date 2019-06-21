@@ -14,6 +14,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 
 class GenerateManifestsCommand extends ContainerAwareCommand
 {
+    private $serviceUrl;
     private $apiUrl;
     private $apiUsername;
     private $apiKey;
@@ -50,6 +51,8 @@ class GenerateManifestsCommand extends ContainerAwareCommand
         $this->metadataPrefix = $this->getContainer()->getParameter('datahub.metadataprefix');
         $this->dataDefinition = $this->getContainer()->getParameter('datahub.data_definition');
         $this->exifFields = $this->getContainer()->getParameter('exif_fields');
+
+        $this->serviceUrl = $this->getContainer()->getParameter('service_url');
 
         // Make sure the API URL does not end with a '?' character
         $this->apiUrl = rtrim($this->getContainer()->getParameter('api_url'), '?');
@@ -132,12 +135,7 @@ class GenerateManifestsCommand extends ContainerAwareCommand
                     $newResourceSpaceData['data_pid'] = $data->value;
                     $dataPid = $data->value;
                 } else if($data->name == 'originalfilename') {
-                    // TODO image ID with or without extension?
-                    // With extension
                     $newResourceSpaceData['image_id'] = $data->value;
-                    // Without extension
-//                    $dotPos = strrpos($data->value, '.');
-//                    $newResourceSpaceData['image_id'] = $dotPos > 0 ? substr($data->value, 0, $dotPos) : $data->value;
                 }
             }
 
@@ -364,7 +362,7 @@ class GenerateManifestsCommand extends ContainerAwareCommand
     private function addArthubRelations(& $imageData)
     {
         foreach($imageData as $dataPid => $value) {
-            $imageData[$dataPid]['attribution'] = 'https://arthub.vlaamsekunstcollectie.be/nl/catalog/' . $value['manifest_id'];
+            $imageData[$dataPid]['related'] = 'https://arthub.vlaamsekunstcollectie.be/nl/catalog/' . $value['manifest_id'];
         }
     }
 
@@ -419,15 +417,15 @@ class GenerateManifestsCommand extends ContainerAwareCommand
             $index = 0;
             foreach($canvasData as $canvas) {
                 $index++;
-                $canvasId = 'https://imagehub.vlaamsekunstcollectie.be/iiif/2/' . $value['manifest_id'] . '/canvas/' . $index;
+                $canvasId = $this->serviceUrl . $value['manifest_id'] . '/canvas/' . $index . '.json';
                 $service = array(
                     '@context' => 'http://iiif.io/api/image/2/context.json',
-                    '@id'      => 'http://imagehub.vlaamsekunstcollectie.be/iiif/2/' . $canvas['image_id'],
+                    '@id'      => $this->serviceUrl . $canvas['image_id'],
                     'profile'  => 'http://iiif.io/api/image/2/level2.json'
                 );
                 $resource = array(
                     // TODO is it a correct assumption that the resource type is 'jpeg'?
-                    '@id'     => 'https://imagehub.vlaamsekunstcollectie.be/iiif/2/' . $canvas['image_id'] . '/full/full/0/default.jpg',
+                    '@id'     => $this->serviceUrl . $canvas['image_id'] . '/full/full/0/default.jpg',
                     '@type'   => 'dctypes:Image',
                     'format'  => 'image/jpeg',
                     'service' => $service,
@@ -466,7 +464,7 @@ class GenerateManifestsCommand extends ContainerAwareCommand
                 'canvases' => $canvases
             );
 
-            $manifestId = 'https://imagehub.vlaamsekunstcollectie.be/iiif/2/' . $value['manifest_id'] . '/manifest';
+            $manifestId = $this->serviceUrl . $value['manifest_id'] . '/manifest.json';
             // Generate the whole manifest
             $manifest = array(
                 '@context'         => 'http://iiif.io/api/presentation/2/context.json',

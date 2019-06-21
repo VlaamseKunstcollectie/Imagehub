@@ -5,6 +5,9 @@ parameters:
     # Name of the application as shown on the homepage
     service_name: 'ImageHub'
 
+    # Address of the application, necessary to generate manifest and canvas ID's
+    service_url: 'https://imagehub.vlaamsekunstcollectie.be'
+
     # The default locale (language) of the application (available locales: en|nl)
     locale: nl
 
