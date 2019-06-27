@@ -206,7 +206,7 @@ class GenerateManifestsCommand extends ContainerAwareCommand
                     $sortOrder = 1;
                     if($domNode->attributes) {
                         for($i = 0; $i < $domNode->attributes->length; $i++) {
-                            if($domNode->attributes->item($i)->nodeName == 'xml:sortorder') {
+                            if($domNode->attributes->item($i)->nodeName == $this->namespace . ':sortorder') {
                                 $sortOrder = $domNode->attributes->item($i)->nodeValue;
                             }
                         }
