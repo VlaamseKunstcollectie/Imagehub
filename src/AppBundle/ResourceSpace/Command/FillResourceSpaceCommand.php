@@ -73,19 +73,22 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
         // Loop through all files in the folder
         $imageFiles = scandir($folder);
         foreach ($imageFiles as $imageFile) {
+            if($imageFile == '.' || $imageFile == '..') {
+                continue;
+            }
             try {
-                $info = pathinfo($imageFile);
                 $isSupportedImage = false;
-
+                $imagePath = $folder . $imageFile;
+                $imagick = new Imagick($imagePath);
                 // Check if the file is in (one of) the supported format(s)
                 foreach ($supportedExtensions as $supportedExtension) {
-                    if ($info['extension'] == $supportedExtension) {
+                    if ($imagick->getImageFormat() == $supportedExtension) {
                         $isSupportedImage = true;
                         break;
                     }
                 }
                 if ($isSupportedImage) {
-                    $this->processImage($folder . $imageFile);
+                    $this->processImage($imagePath, $imagick);
                 } else {
                     // TODO log incorrect file extension
                 }
@@ -96,25 +99,28 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
         }
     }
 
-    protected function processImage($image)
+    protected function processImage($image, $imagick)
     {
-        $jpegImage = substr($image, 0, strrpos($image, '.')) . '.jpg';
+        $pos = strrpos($image, '.');
+        if($pos >= 0) {
+            $jpegImage = substr($image, 0, $pos) . '.jpg';
+        } else {
+            $jpegImage = $image . '.jpg';
+        }
 
         $imageDimensions = getimagesize($image);
         $imageWidth = $imageDimensions[0];
         $imageHeight = $imageDimensions[1];
         try {
-            $imagick = new Imagick($image);
             $maxDimension = $this->getContainer()->getParameter('scale_image_pixels');
             if($imageWidth > $maxDimension || $imageHeight > $maxDimension) {
                 $imagick->scaleImage($imageWidth >= $imageHeight ? $maxDimension : 0, $imageWidth < $imageHeight ? $maxDimension : 0);
             }
             $imagick->setFormat('jpeg');
             $imagick->writeImage($jpegImage);
-        } catch (ImagickException $e) {
+        } catch (Exception $e) {
             echo $e . PHP_EOL;
         }
-
 
         $md5 = md5_file($jpegImage);
         $exifData = exif_read_data($image);
@@ -220,7 +226,11 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
         }
 
         // Delete the JPEG image we created
-        unlink($jpegImage);
+        try {
+            unlink($jpegImage);
+        } catch(Exception $e) {
+
+        }
     }
 
     protected function getCurrentResourceSpaceData()

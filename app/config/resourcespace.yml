@@ -1,7 +1,7 @@
 parameters:
     images_folder: '../images/'
     supported_extensions:
-        - tif
+        - TIFF
     scale_image_pixels: 1800
     cantaloupe_url: 'http://imagehub.box/iiif/2/'
 
