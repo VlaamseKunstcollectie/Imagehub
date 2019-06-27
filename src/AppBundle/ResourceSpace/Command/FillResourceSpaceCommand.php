@@ -78,8 +78,8 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
             }
             try {
                 $isSupportedImage = false;
-                $imagePath = $folder . $imageFile;
-                $imagick = new Imagick($imagePath);
+                $fullImagePath = $folder . $imageFile;
+                $imagick = new Imagick($fullImagePath);
                 // Check if the file is in (one of) the supported format(s)
                 foreach ($supportedExtensions as $supportedExtension) {
                     if ($imagick->getImageFormat() == $supportedExtension) {
@@ -88,10 +88,11 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
                     }
                 }
                 if ($isSupportedImage) {
-                    $this->processImage($imagePath, $imagick);
+                    $this->processImage($imageFile, $fullImagePath, $imagick);
                 } else {
-                    // TODO log incorrect file extension
+                    // TODO log incorrect file extensions
                 }
+                $imagick->clear();
             }
             catch(Exception $e) {
                 echo $e . PHP_EOL;
@@ -99,16 +100,16 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
         }
     }
 
-    protected function processImage($image, $imagick)
+    protected function processImage($imageFile, $fullImagePath, $imagick)
     {
-        $pos = strrpos($image, '.');
-        if($pos >= 0) {
-            $jpegImage = substr($image, 0, $pos) . '.jpg';
+        $pos = strrpos($imageFile, '.');
+        if($pos) {
+            $jpegImage = substr($imageFile, 0, $pos) . '.jpg';
         } else {
-            $jpegImage = $image . '.jpg';
+            $jpegImage = $imageFile . '.jpg';
         }
 
-        $imageDimensions = getimagesize($image);
+        $imageDimensions = getimagesize($fullImagePath);
         $imageWidth = $imageDimensions[0];
         $imageHeight = $imageDimensions[1];
         try {
@@ -123,7 +124,7 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
         }
 
         $md5 = md5_file($jpegImage);
-        $exifData = exif_read_data($image);
+        $exifData = exif_read_data($fullImagePath);
 
         $dataPid = null;
         $newData = array();
@@ -185,7 +186,7 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
                 }
             }
             catch(OaipmhException $e) {
-                echo $e . PHP_EOL;
+                echo 'Image ' . $fullImagePath . ' error: ' . $e . PHP_EOL;
             }
         }
 
@@ -285,7 +286,7 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
 
     protected function replaceResourceSpaceFile($id, $image)
     {
-        $query = 'user=' . $this->apiUsername . '&function=upload_file&param1=' . $id . '&param2=true&param3=&param4=&param5=' . urlencode($image);
+        $query = 'user=' . $this->apiUsername . '&function=upload_file&param1=' . $id . '&param2=1&param3=&param4=&param5=' . urlencode($image);
         $url = $this->apiUrl . '?' . $query . '&sign=' . $this->getSign($query);
         $data = file_get_contents($url);
         return $data;
