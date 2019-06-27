@@ -72,10 +72,10 @@ class GenerateManifestsCommand extends ContainerAwareCommand
         $dm->getDocumentCollection('CanvasBundle:Canvas')->remove([]);
 
         $imageData = $this->getResourceSpaceData();
-        $this->addCantaloupeData($imageData);
-        $this->addDatahubData($imageData);
-        $this->addAllRelations($imageData);
-        $this->addArthubRelations($imageData);
+        $imageData = $this->addCantaloupeData($imageData);
+        $imageData = $this->addDatahubData($imageData);
+        $imageData = $this->addAllRelations($imageData);
+        $imageData = $this->addArthubRelations($imageData);
         $this->generateAndStoreManifests($imageData, $dm);
     }
 
@@ -158,18 +158,12 @@ class GenerateManifestsCommand extends ContainerAwareCommand
         $expl = explode(':', $dataPid);
         $manifestId = '';
         for($i = 2; $i < count($expl); $i++) {
-            $toAdd = $expl[$i];
-            // TODO seems like a very hackish solution to remove the '.be' at the end of the institution ID, this should probably be improved
-            $dotBeIndex = strpos($expl[$i], '.be');
-            if($dotBeIndex > 0) {
-                $toAdd = substr($toAdd, 0, $dotBeIndex);
-            }
-            $manifestId .= (empty($manifestId) ? '' : ':') . $toAdd;
+            $manifestId .= (empty($manifestId) ? '' : ':') . $expl[$i];
         }
         return $manifestId;
     }
 
-    private function addDatahubData(& $imageData)
+    private function addDatahubData($imageData)
     {
         try {
             // Fetch the necessary data from the Datahub
@@ -177,12 +171,19 @@ class GenerateManifestsCommand extends ContainerAwareCommand
                 $this->datahubEndpoint = Endpoint::build($this->datahubUrl);
 
             foreach($imageData as $dataPid => $value) {
-                $this->addDatahubDataToImage($dataPid, $imageData);
+                try {
+                    $this->addDatahubDataToImage($dataPid, $imageData);
+                }
+                catch(Exception $e) {
+                    unset($imageData[$dataPid]);
+                    echo $e . PHP_EOL;
+                }
             }
         }
         catch(Exception $e) {
             echo $e . PHP_EOL;
         }
+        return $imageData;
     }
 
     private function addDatahubDataToImage($dataPid, & $imageData)
@@ -328,7 +329,7 @@ class GenerateManifestsCommand extends ContainerAwareCommand
             }
         }
 
-        // Loop through all data pid's and keep adding relations until all related works contain references to each other
+        // Loop through all data pids and keep adding relations until all related works contain references to each other
         $relationsChanged = true;
         while($relationsChanged) {
             $relationsChanged = false;
@@ -348,15 +349,21 @@ class GenerateManifestsCommand extends ContainerAwareCommand
 
         foreach($relations as $dataPid => $related) {
             foreach($related as $pid) {
-                if($dataPid != $pid) {
-                    if (!array_key_exists($pid, $imageData[$dataPid]['related_works'])) {
-                        $data = $this->getBasicMetadata($imageData[$pid]);
-                        $data['related_work_type'] = 'related';
-                        $imageData[$dataPid]['related_works'][] = $data;
+                if(array_key_exists($pid, $imageData)) {
+                    if ($dataPid != $pid) {
+                        if (array_key_exists($dataPid, $imageData)) {
+                            if (!array_key_exists($pid, $imageData[$dataPid]['related_works'])) {
+                                $data = $this->getBasicMetadata($imageData[$pid]);
+                                $data['related_work_type'] = 'related';
+                                $imageData[$dataPid]['related_works'][] = $data;
+                            }
+                        }
                     }
                 }
             }
         }
+
+        return $imageData;
     }
 
     private function addArthubRelations(& $imageData)
@@ -364,9 +371,10 @@ class GenerateManifestsCommand extends ContainerAwareCommand
         foreach($imageData as $dataPid => $value) {
             $imageData[$dataPid]['related'] = 'https://arthub.vlaamsekunstcollectie.be/nl/catalog/' . $value['manifest_id'];
         }
+        return $imageData;
     }
 
-    private function addCantaloupeData(& $imageData)
+    private function addCantaloupeData($imageData)
     {
         foreach($imageData as $dataPid => $value) {
             try {
@@ -379,11 +387,11 @@ class GenerateManifestsCommand extends ContainerAwareCommand
                 // TODO proper error reporting
             }
         }
+        return $imageData;
     }
 
     private function generateAndStoreManifests($imageData, $dm)
     {
-        $manifests = array();
         foreach($imageData as $dataPid => $value) {
 
             // Fill in (multilingual) manifest data
@@ -424,7 +432,6 @@ class GenerateManifestsCommand extends ContainerAwareCommand
                     'profile'  => 'http://iiif.io/api/image/2/level2.json'
                 );
                 $resource = array(
-                    // TODO is it a correct assumption that the resource type is 'jpeg'?
                     '@id'     => $this->serviceUrl . $canvas['image_id'] . '/full/full/0/default.jpg',
                     '@type'   => 'dctypes:Image',
                     'format'  => 'image/jpeg',
@@ -435,7 +442,6 @@ class GenerateManifestsCommand extends ContainerAwareCommand
                 $image = array(
                     '@context'   => 'http://iiif.io/api/presentation/2/context.json',
                     '@type   '   => 'oa:Annotation',
-                    // TODO is it a correct assumption that the motivation is 'painting'?
                     'motivation' => 'sc:painting',
                     'resource'   => $resource,
                     'on'         => $canvasId
@@ -469,7 +475,6 @@ class GenerateManifestsCommand extends ContainerAwareCommand
             $manifest = array(
                 '@context'         => 'http://iiif.io/api/presentation/2/context.json',
                 '@type'            => 'sc:Manifest',
-                // TODO with or without preceding https://? example manifest and ETL5 documentation give 2 different results
                 '@id'              => $manifestId,
                 'label'            => $value['label'],
                 'attribution'      => $value['attribution'],
@@ -489,7 +494,5 @@ class GenerateManifestsCommand extends ContainerAwareCommand
             $dm->flush();
             $dm->clear();
         }
-
-        return $manifests;
     }
 }
