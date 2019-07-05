@@ -7,6 +7,7 @@ use Exception;
 use Imagick;
 use ImagickException;
 use Phpoaipmh\Endpoint;
+use Phpoaipmh\Exception\HttpException;
 use Phpoaipmh\Exception\OaipmhException;
 use Symfony\Bundle\FrameworkBundle\Command\ContainerAwareCommand;
 use Symfony\Component\Console\Input\InputArgument;
@@ -186,6 +187,9 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
                 }
             }
             catch(OaipmhException $e) {
+                echo 'Image ' . $fullImagePath . ' error: ' . $e . PHP_EOL;
+            }
+            catch(HttpException $e) {
                 echo 'Image ' . $fullImagePath . ' error: ' . $e . PHP_EOL;
             }
         }
