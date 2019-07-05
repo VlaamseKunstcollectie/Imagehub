@@ -441,7 +441,8 @@ class GenerateManifestsCommand extends ContainerAwareCommand
                 );
                 $image = array(
                     '@context'   => 'http://iiif.io/api/presentation/2/context.json',
-                    '@type   '   => 'oa:Annotation',
+                    '@type'      => 'oa:Annotation',
+                    '@id'        => $canvasId . '/image',
                     'motivation' => 'sc:painting',
                     'resource'   => $resource,
                     'on'         => $canvasId
@@ -479,7 +480,7 @@ class GenerateManifestsCommand extends ContainerAwareCommand
                 'label'            => $value['label'],
                 'attribution'      => $value['attribution'],
                 'related'          => $value['related'],
-                'description'      => $value['description'],
+                'description'      => empty($value['description']) ? $value['label'] : $value['description'],
                 'metadata'         => $manifestMetadata,
                 'viewingDirection' => 'left-to-right',
                 'viewingHint'      => 'individuals',
