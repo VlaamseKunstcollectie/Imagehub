@@ -55,9 +55,9 @@ class GenerateManifestsCommand extends ContainerAwareCommand
         $this->serviceUrl = $this->getContainer()->getParameter('service_url');
 
         // Make sure the API URL does not end with a '?' character
-        $this->apiUrl = rtrim($this->getContainer()->getParameter('api_url'), '?');
-        $this->apiUsername = $this->getContainer()->getParameter('api_username');
-        $this->apiKey = $this->getContainer()->getParameter('api_key');
+        $this->apiUrl = rtrim($this->getContainer()->getParameter('resourcespace_api_url'), '?');
+        $this->apiUsername = $this->getContainer()->getParameter('resourcespace_api_username');
+        $this->apiKey = $this->getContainer()->getParameter('resourcespace_api_key');
 
         $this->cantaloupeUrl = $this->getContainer()->getParameter('cantaloupe_url');
 
