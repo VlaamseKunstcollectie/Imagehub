@@ -4,7 +4,7 @@ parameters:
     service_url: 'https://imagehub.vlaamsekunstcollectie.be'
     locale: nl
     service_address: 'info@vlaamsekunstcollectie.be'
-    datahub_url: 'http://datahub.box.be/oai'
+    datahub_url: 'http://datahub.vlaamsekunstcollectie.be/oai'
     datahub_language: 'nl'
     mongodb_server: 'mongodb://127.0.0.1:27017/imagehub'
     mongodb_database: imagehub
