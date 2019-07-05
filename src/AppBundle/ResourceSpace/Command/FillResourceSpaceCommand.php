@@ -77,9 +77,12 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
             if($imageFile == '.' || $imageFile == '..') {
                 continue;
             }
+            $fullImagePath = $folder . $imageFile;
+            if(is_dir($fullImagePath) || !is_file($fullImagePath)) {
+                continue;
+            }
             try {
                 $isSupportedImage = false;
-                $fullImagePath = $folder . $imageFile;
                 $imagick = new Imagick($fullImagePath);
                 // Check if the file is in (one of) the supported format(s)
                 foreach ($supportedExtensions as $supportedExtension) {
