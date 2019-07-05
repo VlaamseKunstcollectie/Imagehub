@@ -45,12 +45,12 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
         }
         $this->datahubUrl = $input->getArgument('url');
         if(!$this->datahubUrl) {
-            $this->datahubUrl = $this->getContainer()->getParameter('datahub.url');
+            $this->datahubUrl = $this->getContainer()->getParameter('datahub_url');
         }
-        $this->datahubLanguage = $this->getContainer()->getParameter('datahub.language');
-        $this->namespace = $this->getContainer()->getParameter('datahub.namespace');
-        $this->metadataPrefix = $this->getContainer()->getParameter('datahub.metadataprefix');
-        $this->dataDefinition = $this->getContainer()->getParameter('datahub.data_definition');
+        $this->datahubLanguage = $this->getContainer()->getParameter('datahub_language');
+        $this->namespace = $this->getContainer()->getParameter('datahub_namespace');
+        $this->metadataPrefix = $this->getContainer()->getParameter('datahub_metadataprefix');
+        $this->dataDefinition = $this->getContainer()->getParameter('datahub_data_definition');
         $this->exifFields = $this->getContainer()->getParameter('exif_fields');
 
         // Make sure the folder name ends with a trailing slash
