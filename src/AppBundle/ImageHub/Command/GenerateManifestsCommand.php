@@ -27,6 +27,15 @@ class GenerateManifestsCommand extends ContainerAwareCommand
     private $datahubEndpoint;
     private $cantaloupeUrl;
 
+    //The data PID's we want to generate manifests for
+    private $dataPids;
+
+    // All datahub data with the data PID's as key
+    private $imagehubData;
+
+    // All image data with the image ID's as key
+    private $imageData;
+
     protected function configure()
     {
         $this
@@ -71,12 +80,14 @@ class GenerateManifestsCommand extends ContainerAwareCommand
         $dm->getDocumentCollection('ManifestBundle:Manifest')->remove([]);
         $dm->getDocumentCollection('CanvasBundle:Canvas')->remove([]);
 
-        $imageData = $this->getResourceSpaceData();
-        $imageData = $this->addCantaloupeData($imageData);
-        $imageData = $this->addDatahubData($imageData);
-        $imageData = $this->addAllRelations($imageData);
-        $imageData = $this->addArthubRelations($imageData);
-        $this->generateAndStoreManifests($imageData, $dm);
+        $this->getResourceSpaceData();
+        $this->addCantaloupeData();
+        $this->addDatahubData();
+        $this->addAllRelations();
+        $this->fixSortOrders();
+        $this->addArthubRelations();
+        var_dump($this->imagehubData);
+        $this->generateAndStoreManifests($dm);
     }
 
     private function getResourceInfo($id)
@@ -114,46 +125,55 @@ class GenerateManifestsCommand extends ContainerAwareCommand
         $allResources = file_get_contents($url);
         $resources = json_decode($allResources, true);
 
-        $imageData = array();
+        $this->dataPids = array();
+        $this->imagehubData = array();
+        $this->imageData = array();
         foreach($resources as $resource) {
             $currentData = $this->getResourceInfo($resource['ref']);
-            $newResourceSpaceData = array(
+            $newDatahubData = array(
                 'label'         => '',
                 'attribution'   => '',
                 'related'       => '',
                 'description'   => '',
                 'data_pid'      => '',
                 'related_works' => array(),
-                'sort_order'    => 1,
-                'height'        => 0,
-                'width'         => 0
+                'image_ids'     => array()
             );
 
             $dataPid = null;
+            $imageId = null;
             foreach($currentData as $data) {
                 if($data->name == 'pidafbeelding') {
-                    $newResourceSpaceData['data_pid'] = $data->value;
+                    $newDatahubData['data_pid'] = $data->value;
                     $dataPid = $data->value;
                 } else if($data->name == 'originalfilename') {
-                    $newResourceSpaceData['image_id'] = $data->value;
+                    $newDatahubData['image_ids'][] = $data->value;
+                    $imageId = $data->value;
                 }
             }
 
-            $newResourceSpaceData['manifest_id'] = $this->getManifestId($dataPid);
+            $newDatahubData['manifest_id'] = $this->extractManifestId($dataPid);
 
             // Add related works if this dataPid is already present in the image data
-            if(array_key_exists($dataPid, $imageData)) {
-                $newResourceSpaceData['related_work_type'] = 'relatedto';
-                $imageData[$dataPid]['related_works'][$dataPid] = $newResourceSpaceData;
+            if(array_key_exists($dataPid, $this->imagehubData)) {
+                $this->imagehubData[$dataPid]['image_ids'][] = $imageId;
             } else {
-                $imageData[$dataPid] = $newResourceSpaceData;
+                $this->imagehubData[$dataPid] = $newDatahubData;
             }
+            if(!in_array($dataPid, $this->dataPids)) {
+                $this->dataPids[] = $dataPid;
+            }
+            $this->imageData[$imageId] = array();
         }
-        return $imageData;
+
+        // Sort image ID's in ascending order
+        foreach($this->imagehubData as $dataPid => $data) {
+            sort($this->imagehubData[$dataPid]['image_ids']);
+        }
     }
 
     // Generates manifest ID's based on institution + work ID
-    private function getManifestId($dataPid)
+    private function extractManifestId($dataPid)
     {
         $expl = explode(':', $dataPid);
         $manifestId = '';
@@ -163,19 +183,34 @@ class GenerateManifestsCommand extends ContainerAwareCommand
         return $manifestId;
     }
 
-    private function addDatahubData($imageData)
+    private function addCantaloupeData()
+    {
+        foreach($this->imageData as $imageId => $imageData) {
+            try {
+                $jsonData = file_get_contents($this->cantaloupeUrl . $imageId . '/info.json');
+                $data = json_decode($jsonData);
+                $this->imageData[$imageId]['height'] = $data->height;
+                $this->imageData[$imageId]['width'] = $data->width;
+            } catch(Exception $e) {
+                echo $e->getMessage();
+                // TODO proper error reporting
+            }
+        }
+    }
+
+    private function addDatahubData()
     {
         try {
             // Fetch the necessary data from the Datahub
             if (!$this->datahubEndpoint)
                 $this->datahubEndpoint = Endpoint::build($this->datahubUrl);
 
-            foreach($imageData as $dataPid => $value) {
+            foreach($this->imagehubData as $dataPid => $value) {
                 try {
-                    $this->addDatahubDataToImage($dataPid, $imageData);
+                    $this->addDatahubDataToImage($dataPid);
                 }
                 catch(Exception $e) {
-                    unset($imageData[$dataPid]);
+                    unset($this->imagehubData[$dataPid]);
                     echo $e . PHP_EOL;
                 }
             }
@@ -183,10 +218,9 @@ class GenerateManifestsCommand extends ContainerAwareCommand
         catch(Exception $e) {
             echo $e . PHP_EOL;
         }
-        return $imageData;
     }
 
-    private function addDatahubDataToImage($dataPid, & $imageData)
+    private function addDatahubDataToImage($dataPid)
     {
         $record = $this->datahubEndpoint->getRecord($dataPid, $this->metadataPrefix);
         $data = $record->GetRecord->record->metadata->children($this->namespace, true);
@@ -239,34 +273,40 @@ class GenerateManifestsCommand extends ContainerAwareCommand
                     }
                     if($relatedDataPid != null) {
                         if($relation == null) {
-                            $relation = 'related';
-                        }
-                        // Get the image ID for the related data pid
-                        // TODO what to do when are multiple images linked to the same data pid?
-                        $imageId = '';
-                        $height = 0;
-                        $width = 0;
-                        if(array_key_exists($relatedDataPid, $imageData)) {
-                            $imageId = $imageData[$relatedDataPid]['image_id'];
-                            $height = $imageData[$relatedDataPid]['height'];
-                            $width = $imageData[$relatedDataPid]['width'];
+                            $relation = 'relation';
                         }
                         $arr = array(
                             'related_work_type' => $relation,
                             'data_pid'          => $relatedDataPid,
-                            'image_id'          => $imageId,
-                            'sort_order'        => $sortOrder,
-                            'height'            => $height,
-                            'width'             => $width
+                            'sort_order'        => $sortOrder
                         );
-                        $imageData[$dataPid]['related_works'][$relatedDataPid] = $arr;
+                        $this->imagehubData[$dataPid]['related_works'][$relatedDataPid] = $arr;
+
+                        // If we don't have any datahub data on this data PID yet, fetch and add it
+                        // Set manifest id to empty string because we won't generate a manifest for this one,
+                        // since we don't have any image data on it
+                        // We're mostly just interested in its related works
+                        if(!array_key_exists($relatedDataPid, $this->imagehubData)) {
+                            $newDatahubData = array(
+                                'label'         => '',
+                                'attribution'   => '',
+                                'related'       => '',
+                                'description'   => '',
+                                'data_pid'      => $relatedDataPid,
+                                'related_works' => array(),
+                                'image_ids'     => array(),
+                                'manifest_id'   => ''
+                            );
+                            $this->imagehubData[$relatedDataPid] = $newDatahubData;
+                            $this->addDatahubDataToImage($relatedDataPid);
+                        }
                     }
                 }
             }
         }
 
         // All all (multilingual) metadata along with title and description
-        $imageData[$dataPid]['metadata'] = array();
+        $this->imagehubData[$dataPid]['metadata'] = array();
         foreach($this->datahubLanguages as $language) {
             foreach ($this->dataDefinition as $key => $dataDef) {
                 if(!array_key_exists('label', $dataDef) && $key != 'short_description') {
@@ -286,19 +326,19 @@ class GenerateManifestsCommand extends ContainerAwareCommand
                 }
                 if ($value != null) {
                     if(array_key_exists('label', $dataDef)) {
-                        if (!array_key_exists($dataDef['label'], $imageData[$dataPid]['metadata'])) {
-                            $imageData[$dataPid]['metadata'][$dataDef['label']] = array();
+                        if (!array_key_exists($dataDef['label'], $this->imagehubData[$dataPid]['metadata'])) {
+                            $this->imagehubData[$dataPid]['metadata'][$dataDef['label']] = array();
                         }
-                        $imageData[$dataPid]['metadata'][$dataDef['label']][$language] = $value;
+                        $this->imagehubData[$dataPid]['metadata'][$dataDef['label']][$language] = $value;
                     }
                     // Add manifest-level metadata (label, attribution, description)
                     if($language == $this->datahubLanguage) {
                         if ($key == 'title') {
-                            $imageData[$dataPid]['label'] = $value;
+                            $this->imagehubData[$dataPid]['label'] = $value;
                         } else if($key == 'publisher') {
-                            $imageData[$dataPid]['attribution'] = $value;
+                            $this->imagehubData[$dataPid]['attribution'] = $value;
                         } else if($key == 'short_description') {
-                            $imageData[$dataPid]['description'] = $value;
+                            $this->imagehubData[$dataPid]['description'] = $value;
                         }
                     }
                 }
@@ -306,39 +346,29 @@ class GenerateManifestsCommand extends ContainerAwareCommand
         }
     }
 
-    private function getBasicMetadata($data)
-    {
-        return array(
-            'data_pid'    => $data['data_pid'],
-            'image_id'    => $data['image_id'],
-            'sort_order'  => $data['sort_order'],
-            'height'      => $data['height'],
-            'width'       => $data['width'],
-        );
-    }
-
-    private function addAllRelations(& $imageData)
+    private function addAllRelations()
     {
         $relations = array();
 
         // Initialize the array containing all directly related works
-        foreach($imageData as $dataPid => $value) {
-            $relations[$dataPid] = array();
-            foreach($value['related_works'] as $relatedWork) {
-                $relations[$dataPid][] = $relatedWork['data_pid'];
-            }
+        foreach($this->imagehubData as $dataPid => $value) {
+            $relations[$dataPid] = $value['related_works'];
         }
 
-        // Loop through all data pids and keep adding relations until all related works contain references to each other
+        // Loop through all data pids and keep adding relations until all (directly or indirectly) related works contain references to each other
         $relationsChanged = true;
         while($relationsChanged) {
             $relationsChanged = false;
             foreach($relations as $dataPid => $related) {
                 foreach($relations as $otherPid => $otherRelation) {
-                    if(in_array($dataPid, $otherRelation)) {
-                        foreach ($related as $pid) {
-                            if (!in_array($pid, $otherRelation)) {
-                                $relations[$otherPid][] = $pid;
+                    if(array_key_exists($dataPid, $otherRelation)) {
+                        foreach ($related as $relatedData) {
+                            if (!array_key_exists($relatedData['data_pid'], $otherRelation)) {
+                                $relations[$otherPid][$relatedData['data_pid']] = array(
+                                    'related_work_type' => 'relation',
+                                    'data_pid'          => $relatedData['data_pid'],
+                                    'sort_order'        => $relatedData['sort_order']
+                                );
                                 $relationsChanged = true;
                             }
                         }
@@ -347,61 +377,137 @@ class GenerateManifestsCommand extends ContainerAwareCommand
             }
         }
 
+        // Add the newly found relations to the appropriate related_works arrays
         foreach($relations as $dataPid => $related) {
-            foreach($related as $pid) {
-                if(array_key_exists($pid, $imageData)) {
-                    if ($dataPid != $pid) {
-                        if (array_key_exists($dataPid, $imageData)) {
-                            if (!array_key_exists($pid, $imageData[$dataPid]['related_works'])) {
-                                $data = $this->getBasicMetadata($imageData[$pid]);
-                                $data['related_work_type'] = 'related';
-                                $imageData[$dataPid]['related_works'][] = $data;
-                            }
+            foreach($related as $relatedData) {
+                if(array_key_exists($relatedData['data_pid'], $this->imagehubData)) {
+                    if (array_key_exists($dataPid, $this->imagehubData)) {
+                        if (!array_key_exists($relatedData['data_pid'], $this->imagehubData[$dataPid]['related_works'])) {
+                            $this->imagehubData[$dataPid]['related_works'][$relatedData['data_pid']] = array(
+                                'related_work_type' => 'relation',
+                                'data_pid'          => $relatedData['data_pid'],
+                                'sort_order'        => $relatedData['sort_order']
+                            );
                         }
                     }
                 }
             }
         }
 
-        return $imageData;
-    }
-
-    private function addArthubRelations(& $imageData)
-    {
-        foreach($imageData as $dataPid => $value) {
-            $imageData[$dataPid]['related'] = 'https://arthub.vlaamsekunstcollectie.be/nl/catalog/' . $value['manifest_id'];
-        }
-        return $imageData;
-    }
-
-    private function addCantaloupeData($imageData)
-    {
-        foreach($imageData as $dataPid => $value) {
-            try {
-                $jsonData = file_get_contents($this->cantaloupeUrl . $value['image_id'] . '/info.json');
-                $data = json_decode($jsonData);
-                $imageData[$dataPid]['height'] = $data->height;
-                $imageData[$dataPid]['width'] = $data->width;
-            } catch(Exception $e) {
-                echo $e->getMessage();
-                // TODO proper error reporting
+        // Add reference to itself
+        foreach($this->imagehubData as $dataPid => $value) {
+            if (!array_key_exists($dataPid, $value['related_works'])) {
+                if(!empty($value['related_works'])) {
+                    // TODO log this, shouldn't be possible
+                } else {
+                    $this->imagehubData[$dataPid]['related_works'][$dataPid] = array(
+                        'related_work_type' => 'relation',
+                        'data_pid'          => $dataPid,
+                        'sort_order'        => 1
+                    );
+                }
             }
         }
-        return $imageData;
     }
 
-    private function generateAndStoreManifests($imageData, $dm)
+    private function isHigherOrder($type, $highestType)
     {
-        foreach($imageData as $dataPid => $value) {
+        if($highestType == null) {
+            return true;
+        } else if($highestType == 'isPartOf') {
+            return false;
+        } else if($highestType == 'relation') {
+            return $type == 'isPartOf';
+        } else if($highestType == 'hasPart') {
+            return $type == 'isPartOf' || $type == 'relation';
+        } else {
+            return true;
+        }
+    }
+
+    private function fixSortOrders()
+    {
+        foreach($this->imagehubData as $dataPid => $value) {
+            if(count($value['related_works']) > 1) {
+
+                // Sort based on data pids to ensure all related_works for related data pid's contain exactly the same information in the same order
+                ksort($this->imagehubData[$dataPid]['related_works']);
+
+                // Check for colliding sort orders
+                $mismatch = true;
+                while($mismatch) {
+                    $mismatch = false;
+                    foreach ($this->imagehubData[$dataPid]['related_works'] as $pid => $relatedWork) {
+                        $order = $this->imagehubData[$dataPid]['related_works'][$pid]['sort_order'];
+
+                        foreach ($this->imagehubData[$dataPid]['related_works'] as $otherPid => $otherWork) {
+
+                            // Find colliding sort orders
+                            if ($pid != $otherPid && $this->imagehubData[$dataPid]['related_works'][$otherPid]['sort_order'] == $order) {
+
+                                // Upon collision, find out which relation has the highest priority
+                                $highest = null;
+                                $highestType = 'none';
+                                foreach ($this->imagehubData[$dataPid]['related_works'] as $relatedPid => $data) {
+                                    if ($this->imagehubData[$dataPid]['related_works'][$relatedPid]['sort_order'] == $order
+                                        && $this->isHigherOrder($this->imagehubData[$dataPid]['related_works'][$relatedPid]['related_work_type'], $highestType)) {
+                                        $highest = $relatedPid;
+                                        $highestType = $this->imagehubData[$dataPid]['related_works'][$relatedPid]['related_work_type'];
+                                    }
+                                }
+
+                                // Increment the sort order of all related works with the same or higher sort order with one,
+                                // except the one with the highest priority
+                                foreach ($this->imagehubData[$dataPid]['related_works'] as $relatedPid => $data) {
+                                    if ($relatedPid != $highest && $this->imagehubData[$dataPid]['related_works'][$relatedPid]['sort_order'] >= $order) {
+                                        $this->imagehubData[$dataPid]['related_works'][$relatedPid]['sort_order'] = $this->imagehubData[$dataPid]['related_works'][$relatedPid]['sort_order'] + 1;
+                                    }
+                                }
+
+
+                                $mismatch = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                // Sort related works based on sort_order
+                uasort($this->imagehubData[$dataPid]['related_works'], array('AppBundle\ImageHub\Command\GenerateManifestsCommand', 'sortRelatedWorks'));
+            }
+        }
+    }
+
+    private function sortRelatedWorks($a, $b)
+    {
+        return $a['sort_order'] - $b['sort_order'];
+    }
+
+    private function addArthubRelations()
+    {
+        foreach($this->imagehubData as $dataPid => $value) {
+            $this->imagehubData[$dataPid]['related'] = 'https://arthub.vlaamsekunstcollectie.be/nl/catalog/' . $value['manifest_id'];
+        }
+        return $this->imagehubData;
+    }
+
+    private function generateAndStoreManifests($dm)
+    {
+        foreach($this->dataPids as $dataPid) {
+            if(!array_key_exists($dataPid, $this->imagehubData)) {
+                continue;
+            }
+
+            $data = $this->imagehubData[$dataPid];
 
             // Fill in (multilingual) manifest data
             $manifestMetadata = array();
-            foreach($value['metadata'] as $key => $metadata) {
+            foreach($data['metadata'] as $key => $metadata) {
                 $arr = array();
-                foreach($metadata as $language => $data) {
+                foreach($metadata as $language => $value) {
                     $arr[] = array(
                         '@language' => $language,
-                        '@value'    => $data
+                        '@value'    => $value
                     );
                 }
                 $manifestMetadata[] = array(
@@ -410,81 +516,91 @@ class GenerateManifestsCommand extends ContainerAwareCommand
                 );
             }
 
+            // Generate the canvases
             $canvases = array();
-            $canvasData = array($value['sort_order'] => $this->getBasicMetadata($value));
-            foreach($value['related_works'] as $relatedWork) {
-                $index = $relatedWork['sort_order'];
-                // In the case of colliding indexes, increment by 1 as long as needed
-                // This way, we can still (more or less) preserve sort order while ensuring there is no index collision
-                while(array_key_exists($index, $canvasData)) {
-                    $index++;
-                }
-                $canvasData[$index] = $relatedWork;
-            }
-            ksort($canvasData);
             $index = 0;
-            foreach($canvasData as $canvas) {
-                $index++;
-                $canvasId = $this->serviceUrl . $value['manifest_id'] . '/canvas/' . $index . '.json';
-                $service = array(
-                    '@context' => 'http://iiif.io/api/image/2/context.json',
-                    '@id'      => $this->serviceUrl . $canvas['image_id'],
-                    'profile'  => 'http://iiif.io/api/image/2/level2.json'
-                );
-                $resource = array(
-                    '@id'     => $this->serviceUrl . $canvas['image_id'] . '/full/full/0/default.jpg',
-                    '@type'   => 'dctypes:Image',
-                    'format'  => 'image/jpeg',
-                    'service' => $service,
-                    'height'  => $canvas['height'],
-                    'width'   => $canvas['width']
-                );
-                $image = array(
-                    '@context'   => 'http://iiif.io/api/presentation/2/context.json',
-                    '@type'      => 'oa:Annotation',
-                    '@id'        => $canvasId . '/image',
-                    'motivation' => 'sc:painting',
-                    'resource'   => $resource,
-                    'on'         => $canvasId
-                );
-                $newCanvas = array(
-                    '@id'    => $canvasId,
-                    '@type'  => 'sc:Canvas',
-                    'label'  => $canvas['image_id'],
-                    'height' => $canvas['height'],
-                    'width'  => $canvas['width'],
-                    'images' => array($image)
-                );
-                $canvases[] = $newCanvas;
+            $startCanvas = null;
 
-                // Store the canvas in mongodb
-                $canvasDocument = new Canvas();
-                $canvasDocument->setCanvasId($canvasId);
-                $canvasDocument->setData(json_encode($newCanvas));
-                $dm->persist($canvasDocument);
+            // Loop through all works related to this data PID (including itself)
+            foreach($data['related_works'] as $relatedDataPid => $relatedData) {
+                $isStartCanvas = $relatedDataPid == $dataPid;
+
+                // Loop through all image ID's linked to this data PID
+                foreach($this->imagehubData[$relatedDataPid]['image_ids'] as $imageId) {
+                    $index++;
+                    $canvasId = $this->serviceUrl . $data['manifest_id'] . '/canvas/' . $index . '.json';
+                    if($isStartCanvas && $startCanvas == null) {
+                        $startCanvas = $canvasId;
+                    }
+                    $service = array(
+                        '@context' => 'http://iiif.io/api/image/2/context.json',
+                        '@id'      => $this->serviceUrl . $imageId,
+                        'profile'  => 'http://iiif.io/api/image/2/level2.json'
+                    );
+                    $resource = array(
+                        '@id'     => $this->serviceUrl . $imageId . '/full/full/0/default.jpg',
+                        '@type'   => 'dctypes:Image',
+                        'format'  => 'image/jpeg',
+                        'service' => $service,
+                        'height'  => $this->imageData[$imageId]['height'],
+                        'width'   => $this->imageData[$imageId]['width']
+                    );
+                    $image = array(
+                        '@context'   => 'http://iiif.io/api/presentation/2/context.json',
+                        '@type'      => 'oa:Annotation',
+                        '@id'        => $canvasId . '/image',
+                        'motivation' => 'sc:painting',
+                        'resource'   => $resource,
+                        'on'         => $canvasId
+                    );
+                    $newCanvas = array(
+                        '@id'    => $canvasId,
+                        '@type'  => 'sc:Canvas',
+                        'label'  => $imageId,
+                        'height' => $this->imageData[$imageId]['height'],
+                        'width'  => $this->imageData[$imageId]['width'],
+                        'images' => array($image)
+                    );
+                    $canvases[] = $newCanvas;
+
+                    // Store the canvas in mongodb
+                    $canvasDocument = new Canvas();
+                    $canvasDocument->setCanvasId($canvasId);
+                    $canvasDocument->setData(json_encode($newCanvas));
+                    $dm->persist($canvasDocument);
+                }
             }
 
             // Fill in sequence data
-            $manifestSequence = array(
-                '@type'    => 'sc:Sequence',
-                '@context' => 'http://iiif.io/api/presentation/2/context.json',
-                'canvases' => $canvases
-            );
+            if($startCanvas == null) {
+                $manifestSequence = array(
+                    '@type'       => 'sc:Sequence',
+                    '@context'    => 'http://iiif.io/api/presentation/2/context.json',
+                    'canvases'    => $canvases
+                );
+            } else {
+                $manifestSequence = array(
+                    '@type'       => 'sc:Sequence',
+                    '@context'    => 'http://iiif.io/api/presentation/2/context.json',
+                    'startCanvas' => $startCanvas,
+                    'canvases'    => $canvases
+                );
+            }
 
-            $manifestId = $this->serviceUrl . $value['manifest_id'] . '/manifest.json';
+            $manifestId = $this->serviceUrl . $data['manifest_id'] . '/manifest.json';
             // Generate the whole manifest
             $manifest = array(
                 '@context'         => 'http://iiif.io/api/presentation/2/context.json',
                 '@type'            => 'sc:Manifest',
                 '@id'              => $manifestId,
-                'label'            => $value['label'],
-                'attribution'      => $value['attribution'],
-                'related'          => $value['related'],
-                'description'      => empty($value['description']) ? $value['label'] : $value['description'],
+                'label'            => $data['label'],
+                'attribution'      => $data['attribution'],
+                'related'          => $data['related'],
+                'description'      => empty($data['description']) ? $data['label'] : $data['description'],
                 'metadata'         => $manifestMetadata,
                 'viewingDirection' => 'left-to-right',
                 'viewingHint'      => 'individuals',
-                'sequences'        => array($manifestSequence)
+                'sequences'        => array($manifestSequence),
             );
 
             // Store the manifest in mongodb
