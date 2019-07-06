@@ -86,7 +86,6 @@ class GenerateManifestsCommand extends ContainerAwareCommand
         $this->addAllRelations();
         $this->fixSortOrders();
         $this->addArthubRelations();
-        var_dump($this->imagehubData);
         $this->generateAndStoreManifests($dm);
     }
 
