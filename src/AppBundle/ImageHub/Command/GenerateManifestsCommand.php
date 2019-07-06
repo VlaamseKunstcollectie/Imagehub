@@ -490,6 +490,8 @@ class GenerateManifestsCommand extends ContainerAwareCommand
         $dotBeIndex = strpos($expl[0], '.be');
         if($dotBeIndex > 0) {
             $newManifestId = substr($expl[0], 0, $dotBeIndex);
+        } else {
+            $newManifestId = $expl[0];
         }
         for($i = 1; $i < count($expl); $i++) {
             $newManifestId .= (empty($newManifestId) ? '' : ':') . $expl[$i];
