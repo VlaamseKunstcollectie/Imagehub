@@ -1,11 +1,11 @@
 <?php
 namespace AppBundle\ResourceSpace\Command;
 
+use AppBundle\ResourceSpace\ImageBundle\Document\Image;
 use DOMDocument;
 use DOMXPath;
 use Exception;
 use Imagick;
-use ImagickException;
 use Phpoaipmh\Endpoint;
 use Phpoaipmh\Exception\HttpException;
 use Phpoaipmh\Exception\OaipmhException;
@@ -70,33 +70,38 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
             return;
         }
 
+        $dm = $this->getContainer()->get('doctrine_mongodb')->getManager();
 
         // Loop through all files in the folder
         $imageFiles = scandir($folder);
-        foreach ($imageFiles as $imageFile) {
-            if($imageFile == '.' || $imageFile == '..') {
+        foreach ($imageFiles as $imageName) {
+            if($imageName == '.' || $imageName == '..') {
                 continue;
             }
-            $fullImagePath = $folder . $imageFile;
+            $fullImagePath = $folder . $imageName;
             if(is_dir($fullImagePath) || !is_file($fullImagePath)) {
                 continue;
             }
             try {
                 $isSupportedImage = false;
-                $imagick = new Imagick($fullImagePath);
+                $exifData = exif_read_data($fullImagePath);
+
                 // Check if the file is in (one of) the supported format(s)
-                foreach ($supportedExtensions as $supportedExtension) {
-                    if ($imagick->getImageFormat() == $supportedExtension) {
-                        $isSupportedImage = true;
-                        break;
+                if($exifData) {
+                    if(array_key_exists('MimeType', $exifData)) {
+                        foreach ($supportedExtensions as $supportedExtension) {
+                            if ($exifData['MimeType'] == $supportedExtension) {
+                                $isSupportedImage = true;
+                                break;
+                            }
+                        }
                     }
                 }
                 if ($isSupportedImage) {
-                    $this->processImage($imageFile, $fullImagePath, $imagick);
+                    $this->processImage($dm, $imageName, $fullImagePath, $exifData);
                 } else {
                     // TODO log incorrect file extensions
                 }
-                $imagick->clear();
             }
             catch(Exception $e) {
                 echo $e . PHP_EOL;
@@ -104,32 +109,38 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
         }
     }
 
-    protected function processImage($imageFile, $fullImagePath, $imagick)
+    // Takes the first 50,000 and last 50,000 bytes of a file to generate a unique file hash
+    private function getImageHash($imagePath)
     {
-        $pos = strrpos($imageFile, '.');
-        if($pos) {
-            $jpegImage = substr($imageFile, 0, $pos) . '.jpg';
-        } else {
-            $jpegImage = $imageFile . '.jpg';
-        }
+        $fp = fopen($imagePath, 'r');
+        $data = fgets($fp, 50000);
 
-        $imageDimensions = getimagesize($fullImagePath);
-        $imageWidth = $imageDimensions[0];
-        $imageHeight = $imageDimensions[1];
-        try {
-            $maxDimension = $this->getContainer()->getParameter('scale_image_pixels');
-            if($imageWidth > $maxDimension || $imageHeight > $maxDimension) {
-                $imagick->scaleImage($imageWidth >= $imageHeight ? $maxDimension : 0, $imageWidth < $imageHeight ? $maxDimension : 0);
+        fseek($fp, -50000, SEEK_END);
+        $data .= fgets($fp, 50000);
+
+        return md5($data);
+    }
+
+    private function processImage($dm, $imageName, $fullImagePath, $exifData)
+    {
+        $fileChanged = true;
+        $md5 = $this->getImageHash($fullImagePath);
+
+        // Find the corresponding file hash in MongoDB
+        $images = $dm->createQueryBuilder('AppBundle\ResourceSpace\ImageBundle\Document\Image')->field('filename')->equals($imageName)->getQuery()->execute();
+        if(count($images) > 0) {
+            foreach ($images as $image) {
+                if($image->getHash() == $md5) {
+                    $fileChanged = false;
+                } else {
+                    $dm->remove($image);
+                    $dm->flush();
+                    $dm->clear();
+                }
             }
-            $imagick->setFormat('jpeg');
-            $imagick->writeImage($jpegImage);
-        } catch (Exception $e) {
-            echo $e . PHP_EOL;
         }
 
-        $md5 = md5_file($jpegImage);
-        $exifData = exif_read_data($fullImagePath);
-
+        // Extract appropriate EXIF data
         $dataPid = null;
         $newData = array();
         foreach($this->exifFields as $key => $field) {
@@ -143,9 +154,9 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
         }
 
 
+        // Fetch the necessary data from the Datahub
         if($dataPid != null) {
             try {
-                // Fetch the necessary data from the Datahub
                 if (!$this->datahubEndpoint)
                     $this->datahubEndpoint = Endpoint::build($this->datahubUrl);
 
@@ -203,9 +214,9 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
             if($resourceSpaceData['originalfilename'] == $newData['originalfilename']) {
                 $createNew = false;
 
-                // Re-upload the file if the checksums don't match
-                if($resourceSpaceData['file_checksum'] != $md5) {
-                    $this->replaceResourceSpaceFile($id, realpath($jpegImage));
+                // Re-upload the file if the checksums didn't match
+                if($fileChanged) {
+                    $this->uploadToResourceSpace($dm, $md5, $id, $imageName, $fullImagePath, false);
                 }
 
                 // Update fields in ResourceSpace where necessary
@@ -219,29 +230,26 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
                         }
                     }
                     if($update) {
-                        $this->updateResourceSpaceField($id, $key, $value);
+                        $this->updateField($id, $key, $value);
                     }
                 }
                 break;
             }
         }
+
+        // Upload a new file and set all metadata fields if this resource doesn't exist yet
         if($createNew) {
-            $newId = $this->uploadToResourceSpace(realpath($jpegImage));
+            $newId = $this->uploadToResourceSpace($dm, $md5, -1, $imageName, $fullImagePath, true);
             foreach($newData as $key => $value) {
-                $this->updateResourceSpaceField($newId, $key, $value);
+                $this->updateField($newId, $key, $value);
             }
             //TODO log the result if something went wrong
         }
 
         // Delete the JPEG image we created
-        try {
-            unlink($jpegImage);
-        } catch(Exception $e) {
-
-        }
     }
 
-    protected function getCurrentResourceSpaceData()
+    private function getCurrentResourceSpaceData()
     {
         $query = 'user=' . $this->apiUsername . '&function=do_search&param1=';
         $url = $this->apiUrl . '?' . $query . '&sign=' . $this->getSign($query);
@@ -267,7 +275,7 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
         return $data;
     }
 
-    protected function getResourceInfo($id)
+    private function getResourceInfo($id)
     {
         $query = 'user=' . $this->apiUsername . '&function=get_resource_field_data&param1=' . $id;
         $url = $this->apiUrl . '?' . $query . '&sign=' . $this->getSign($query);
@@ -275,7 +283,59 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
         return $data;
     }
 
-    protected function uploadToResourceSpace($image)
+    private function uploadToResourceSpace($dm, $md5, $id, $imageName, $fullImagePath, $createNew)
+    {
+        $result = -1;
+
+        $pos = strrpos($imageName, '.');
+        if($pos) {
+            $jpegImage = substr($imageName, 0, $pos) . '.jpg';
+        } else {
+            $jpegImage = $imageName . '.jpg';
+        }
+        $imageDimensions = getimagesize($fullImagePath);
+        $imageWidth = $imageDimensions[0];
+        $imageHeight = $imageDimensions[1];
+        try {
+            $imagick = new Imagick($fullImagePath);
+            $maxDimension = $this->getContainer()->getParameter('scale_image_pixels');
+            if($imageWidth > $maxDimension || $imageHeight > $maxDimension) {
+                $imagick->scaleImage($imageWidth >= $imageHeight ? $maxDimension : 0, $imageWidth < $imageHeight ? $maxDimension : 0);
+            }
+            $imagick->setFormat('jpeg');
+            $imagick->writeImage($jpegImage);
+
+            $success = false;
+            if($createNew) {
+                $result = $this->uploadImage(realpath($jpegImage));
+                if($result > -1) {
+                    $success = true;
+                }
+            } else {
+                $success = $this->replaceImage($id, realpath($jpegImage));
+            }
+
+            if($success) {
+                $newImage = new Image();
+                $newImage->setFilename($imageName);
+                $newImage->setHash($md5);
+                $dm->persist($newImage);
+                $dm->flush();
+                $dm->clear();
+            }
+            $imagick->clear();
+
+            if(file_exists($jpegImage)) {
+                unlink($jpegImage);
+            }
+        } catch (Exception $e) {
+            echo $e . PHP_EOL;
+        }
+
+        return $result;
+    }
+
+    private function uploadImage($image)
     {
         $query = 'user=' . $this->apiUsername . '&function=create_resource&param1=1&param2=0&param3=' . urlencode($image) . '&param4=1&param5=&param6=&param7=';
         $url = $this->apiUrl . '?' . $query . '&sign=' . $this->getSign($query);
@@ -283,7 +343,7 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
         return $data;
     }
 
-    protected function updateResourceSpaceField($id, $key, $value)
+    private function updateField($id, $key, $value)
     {
         $query = 'user=' . $this->apiUsername . '&function=update_field&param1=' . $id . '&param2=' . $key . '&param3=' . urlencode($value);
         $url = $this->apiUrl . '?' . $query . '&sign=' . $this->getSign($query);
@@ -291,7 +351,7 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
         return $data;
     }
 
-    protected function replaceResourceSpaceFile($id, $image)
+    private function replaceImage($id, $image)
     {
         $query = 'user=' . $this->apiUsername . '&function=upload_file&param1=' . $id . '&param2=1&param3=&param4=&param5=' . urlencode($image);
         $url = $this->apiUrl . '?' . $query . '&sign=' . $this->getSign($query);
@@ -299,7 +359,7 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
         return $data;
     }
 
-    protected function getSign($query)
+    private function getSign($query)
     {
         return hash('sha256', $this->apiKey . $query);
     }

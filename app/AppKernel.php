@@ -19,6 +19,7 @@ class AppKernel extends Kernel
 
             new Doctrine\Bundle\MongoDBBundle\DoctrineMongoDBBundle(),
 
+            new AppBundle\ResourceSpace\ImageBundle\ImageBundle(),
             new AppBundle\ImageHub\ManifestBundle\ManifestBundle(),
             new AppBundle\ImageHub\CanvasBundle\CanvasBundle()
         ];

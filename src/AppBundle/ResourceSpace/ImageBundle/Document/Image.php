@@ -1,13 +1,13 @@
 <?php
 
-namespace AppBundle\ImageHub\ManifestBundle\Document;
+namespace AppBundle\ResourceSpace\ImageBundle\Document;
 
 use Doctrine\ODM\MongoDB\Mapping\Annotations as ODM;
 
 /**
- * @ODM\Document(collection="manifest")
+ * @ODM\Document(collection="image")
  */
-class Manifest
+class Image
 {
     /**
      * @ODM\Id
@@ -17,12 +17,12 @@ class Manifest
     /**
      * @ODM\Field(type="string")
      */
-    private $manifestId;
+    private $filename;
 
     /**
      * @ODM\Field(type="string")
      */
-    private $data;
+    private $hash;
 
     public function getId()
     {
@@ -34,23 +34,24 @@ class Manifest
         $this->id = $id;
     }
 
-    public function getManifestId()
+    public function getFilename()
     {
-        return $this->manifestId;
+        return $this->filename;
     }
 
-    public function setManifestId($manifestId)
+    public function setFilename($filename)
     {
-        $this->manifestId = $manifestId;
+        $this->filename = $filename;
     }
 
-    public function getData()
+    public function getHash()
     {
-        return $this->data;
+        return $this->hash;
     }
 
-    public function setData($data)
+    public function setHash($hash)
     {
-        $this->data = $data;
+        $this->hash = $hash;
     }
+
 }

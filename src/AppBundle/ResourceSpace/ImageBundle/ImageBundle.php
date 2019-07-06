@@ -1,9 +1,9 @@
 <?php
 
-namespace AppBundle\ImageHub\ManifestBundle;
+namespace AppBundle\ResourceSpace\ImageBundle;
 
 use Symfony\Component\HttpKernel\Bundle\Bundle;
 
-class ManifestBundle extends Bundle
+class ImageBundle extends Bundle
 {
 }

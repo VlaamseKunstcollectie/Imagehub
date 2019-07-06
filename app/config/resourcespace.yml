@@ -1,6 +1,6 @@
 parameters:
     supported_extensions:
-        - TIFF
+        - image/tiff
 
     exif_fields:
         # dataPid is required to fetch the relevant record from the Datahub
