@@ -482,10 +482,25 @@ class GenerateManifestsCommand extends ContainerAwareCommand
         return $a['sort_order'] - $b['sort_order'];
     }
 
+    // Filter out the .be in manifest ID's
+    private function filterDotBe($manifestId)
+    {
+        $expl = explode(':', $manifestId);
+        $newManifestId = '';
+        $dotBeIndex = strpos($expl[0], '.be');
+        if($dotBeIndex > 0) {
+            $newManifestId = substr($expl[0], 0, $dotBeIndex);
+        }
+        for($i = 1; $i < count($expl); $i++) {
+            $newManifestId .= (empty($newManifestId) ? '' : ':') . $expl[$i];
+        }
+        return $newManifestId;
+    }
+
     private function addArthubRelations()
     {
         foreach($this->imagehubData as $dataPid => $value) {
-            $this->imagehubData[$dataPid]['related'] = 'https://arthub.vlaamsekunstcollectie.be/nl/catalog/' . $value['manifest_id'];
+            $this->imagehubData[$dataPid]['related'] = 'https://arthub.vlaamsekunstcollectie.be/nl/catalog/' . $this->filterDotBe($value['manifest_id']);
         }
         return $this->imagehubData;
     }
