@@ -307,7 +307,6 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
         $imageHeight = $imageDimensions[1];
         try {
             $imagick = new Imagick($fullImagePath);
-            echo $imagick->getImageCompression();
             $maxDimension = $this->getContainer()->getParameter('scale_image_pixels');
             if($imageWidth > $maxDimension || $imageHeight > $maxDimension) {
                 $imagick->scaleImage($imageWidth >= $imageHeight ? $maxDimension : 0, $imageWidth < $imageHeight ? $maxDimension : 0);
