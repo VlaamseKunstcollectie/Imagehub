@@ -608,6 +608,30 @@ class GenerateManifestsCommand extends ContainerAwareCommand
             $manifestDocument->setData(json_encode($manifest));
             $dm->persist($manifestDocument);
             $dm->flush();
+
+
+            // Validate the manifest and remove if invalid
+            try {
+                $validatorJsonResult = file_get_contents('https://iiif.io/api/presentation/validator/service/validate?format=json&version=2.0&url=' . $manifestId);
+                $validatorResult = json_decode($validatorJsonResult);
+                $okay = $validatorResult->okay == 1;
+                if(!empty($validatorResult->warnings)) {
+                    $okay = false;
+                    foreach($validatorResult->warnings as $warning) {
+                        echo 'Manifest ' . $dataPid . ' warning: ' . $warning . PHP_EOL;
+                    }
+                }
+                if(!empty($validatorResult->error)) {
+                    $okay = false;
+                    echo 'Manifest ' . $dataPid . ' error: ' . $validatorResult->error . PHP_EOL;
+                }
+                if(!$okay) {
+                    $dm->remove($manifestDocument);
+                    $dm->flush();
+                }
+            } catch(Exception $e) {
+                echo 'Error validating manifest for data PID ' . $dataPid . ': ' . $e . PHP_EOL;
+            }
             $dm->clear();
         }
     }
