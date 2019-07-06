@@ -84,6 +84,15 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
             }
             try {
                 $isSupportedImage = false;
+
+                if(strpos($imageName, '.') > -1) {
+                    //TODO log incorrect filename
+                    continue;
+                }
+
+                //TODO check if this image uses JPEG compression
+
+
                 $exifData = exif_read_data($fullImagePath);
 
                 // Check if the file is in (one of) the supported format(s)
@@ -298,6 +307,7 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
         $imageHeight = $imageDimensions[1];
         try {
             $imagick = new Imagick($fullImagePath);
+            echo $imagick->getImageCompression();
             $maxDimension = $this->getContainer()->getParameter('scale_image_pixels');
             if($imageWidth > $maxDimension || $imageHeight > $maxDimension) {
                 $imagick->scaleImage($imageWidth >= $imageHeight ? $maxDimension : 0, $imageWidth < $imageHeight ? $maxDimension : 0);
