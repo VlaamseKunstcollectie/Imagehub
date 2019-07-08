@@ -616,7 +616,7 @@ class GenerateManifestsCommand extends ContainerAwareCommand
                 'label'            => $data['label'],
                 'attribution'      => $data['attribution'],
                 'related'          => $data['related'],
-                'description'      => empty($data['description']) ? $data['label'] : $data['description'],
+                'description'      => empty($data['description']) ? 'n/a' : $data['description'],
                 'metadata'         => $manifestMetadata,
                 'viewingDirection' => 'left-to-right',
                 'viewingHint'      => 'individuals',
