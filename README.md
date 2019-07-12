@@ -80,8 +80,20 @@ installation operational in a production environment.
 
 The imagehub expects a local drop folder to be present containing JPEG-compressed PTIF-images. These images should not be placed inside a subfolder and their filenames should not have an extension. At the very least, all images are expected to have the EXIF-tag 'ImageDescription', containing a data PID that links the image to a record inside the Datahub.
  
+## Preparing ResourceSpace
 
-### Prefilling ResourceSpace
+The metadata fields of your ResourceSpace installation should match the 'field' values of the 'exif_fields' and 'datahub_data_definition' arrays defined in app/config/resourcespace.yml.
+If any of these fields are defined as a drop-down field in ResourceSpace, make sure all possible values in the drop down options have been added before proceeding to the next step.
+
+Before importing the images into ResourceSpace, make sure to append the following lines to config.php inside the includes/ folder of your ResourceSpace installation:
+```php
+$file_checksums=true;
+$file_checksums_50k = false;
+$file_checksums_offline = false;
+```
+
+## Adding images to ResourceSpace
+
 
 In order to import the images from the local drop folder to ResourceSpace, run this command:
 ```bash
@@ -89,7 +101,7 @@ $ php app/console app:fill-resourcespace
 ```
 This command will call the ResourceSpace API to list all images already present in ResourceSpace. It will then loop over all images in the local drop folder, validate them, read their EXIF-tags, compare both the image hash and the EXIF-tags to whatever is already present in ResourceSpace and update the image or EXIF-tags inside the ResourceSpace resource where needed.
 
-### Generating IIIF manifests
+## Generating IIIF manifests
 
 Once ResourceSpace contains all images with the necessary metadata, you can run the following command in order to generate a manifests for each image:
 ```bash
