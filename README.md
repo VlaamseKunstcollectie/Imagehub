@@ -76,7 +76,7 @@ installation operational in a production environment.
 
 ## Usage
 
-### Uploading images
+## Uploading images
 
 The imagehub expects a local drop folder to be present containing JPEG-compressed PTIF-images. These images should not be placed inside a subfolder and their filenames should not have an extension. At the very least, all images are expected to have the EXIF-tag 'ImageDescription', containing a data PID that links the image to a record inside the Datahub.
  
