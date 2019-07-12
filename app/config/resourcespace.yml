@@ -2,6 +2,11 @@ parameters:
     supported_extensions:
         - image/tiff
 
+    # See https://sno.phy.queensu.ca/~phil/exiftool/TagNames/EXIF.html#Compression for a list of all compression types
+    supported_compressions:
+        # JPEG
+        - 7
+
     exif_fields:
         # dataPid is required to fetch the relevant record from the Datahub
         data_pid:
@@ -18,9 +23,10 @@ parameters:
         mime_type:
             exif: 'MimeType'
             field: 'digitalsourcetype'
-        file_size:
-            exif: 'FileSize'
-            field: 'videosize'
+# videosize is only supported for resources of type 'Video'. There does not appear to be any field in the current metadata model to support the file size
+#        file_size:
+#            exif: 'FileSize'
+#            field: 'videosize'
         work_pid:
             exif: 'DocumentName'
             field: 'pidobject'
@@ -54,10 +60,6 @@ parameters:
             xpath: 'descriptiveMetadata[@xml:lang="{language}"]/eventWrap/eventSet/event[eventType/term="production"]/eventActor/actorInRole/actor/nameActorSet/appellationValue[@pref="preferred"]'
             field: 'creatorofartworkobje'
             label: 'Artist'
-        period:
-            xpath: 'descriptiveMetadata[@xml:lang="{language}"]/eventWrap/eventSet/event[eventType/term="production"]/periodName/term'
-            field: 'work-period'
-            label: 'Period'
         date:
             xpath: 'descriptiveMetadata[@xml:lang="{language}"]/eventWrap/eventSet/event[eventType/term="production"]/eventDate/displayDate'
             label: 'Date'
