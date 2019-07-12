@@ -100,6 +100,8 @@ $ php app/console app:fill-resourcespace
 ```
 This command will call the ResourceSpace API to list all images already present in ResourceSpace. It will then loop over all images in the local drop folder, validate them, read their EXIF-tags, compare both the image hash and the EXIF-tags to whatever is already present in ResourceSpace and update the image or EXIF-tags inside the ResourceSpace resource where needed.
 
+You can run this command with the -v flag for verbose output.
+
 ### Generating IIIF manifests
 
 Once ResourceSpace contains all images with the necessary metadata, you can run the following command in order to generate a manifests for each image:
