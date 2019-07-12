@@ -1,11 +1,9 @@
 <?php
 namespace AppBundle\ResourceSpace\Command;
 
-use AppBundle\ResourceSpace\ImageBundle\Document\Image;
 use DOMDocument;
 use DOMXPath;
 use Exception;
-use Imagick;
 use Phpoaipmh\Endpoint;
 use Phpoaipmh\Exception\HttpException;
 use Phpoaipmh\Exception\OaipmhException;
@@ -58,6 +56,7 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
         $folder = rtrim($folder, '/') . '/';
 
         $supportedExtensions = $this->getContainer()->getParameter('supported_extensions');
+        $supportedCompressions = $this->getContainer()->getParameter('supported_compressions');
 
         // Make sure the API URL does not end with a '?' character
         $this->apiUrl = rtrim($this->getContainer()->getParameter('resourcespace_api_url'), '?');
@@ -84,14 +83,14 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
             }
             try {
                 $isSupportedImage = false;
+                $isSupportedCompression = false;
+                $extension = null;
 
                 if(strpos($imageName, '.') > -1) {
+                    echo 'Error: file ' . $imageName . ' has a filename extension.' . PHP_EOL;
                     //TODO log incorrect filename
                     continue;
                 }
-
-                //TODO check if this image uses JPEG compression
-
 
                 $exifData = exif_read_data($fullImagePath);
 
@@ -99,17 +98,34 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
                 if($exifData) {
                     if(array_key_exists('MimeType', $exifData)) {
                         foreach ($supportedExtensions as $supportedExtension) {
-                            if ($exifData['MimeType'] == $supportedExtension) {
+                            if ($exifData['MimeType'] == $supportedExtension['type']) {
                                 $isSupportedImage = true;
+                                $extension = $supportedExtension['extension'];
+                                break;
+                            }
+                        }
+                    }
+                    if(array_key_exists('Compression', $exifData)) {
+                        foreach ($supportedCompressions as $supportedCompression) {
+                            if ($exifData['Compression'] == $supportedCompression) {
+                                $isSupportedCompression = true;
                                 break;
                             }
                         }
                     }
                 }
-                if ($isSupportedImage) {
-                    $this->processImage($dm, $imageName, $fullImagePath, $exifData);
-                } else {
+                if (!$isSupportedImage) {
+                    echo 'Error: file ' . $imageName . ' does not have the correct extension.' . PHP_EOL;
                     // TODO log incorrect file extensions
+                }
+                if(!$isSupportedCompression) {
+                    echo 'Error: file ' . $imageName . ' has the wrong image compression.' . PHP_EOL;
+                    // TODO log incorrect image compression
+                }
+
+                if($isSupportedImage && $isSupportedCompression) {
+                    echo 'Processing ' . $imageName . PHP_EOL;
+                    $this->processImage($dm, $imageName, $fullImagePath, $exifData, $fullImagePath . '.' . $extension);
                 }
             }
             catch(Exception $e) {
@@ -118,36 +134,9 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
         }
     }
 
-    // Takes the first 50,000 and last 50,000 bytes of a file to generate a unique file hash
-    private function getImageHash($imagePath)
+    private function processImage($dm, $imageName, $fullImagePath, $exifData, $imageWithExtension)
     {
-        $fp = fopen($imagePath, 'r');
-        $data = fgets($fp, 50000);
-
-        fseek($fp, -50000, SEEK_END);
-        $data .= fgets($fp, 50000);
-
-        return md5($data);
-    }
-
-    private function processImage($dm, $imageName, $fullImagePath, $exifData)
-    {
-        $fileChanged = true;
-        $md5 = $this->getImageHash($fullImagePath);
-
-        // Find the corresponding file hash in MongoDB
-        $images = $dm->createQueryBuilder('AppBundle\ResourceSpace\ImageBundle\Document\Image')->field('filename')->equals($imageName)->getQuery()->execute();
-        if(count($images) > 0) {
-            foreach ($images as $image) {
-                if($image->getHash() == $md5) {
-                    $fileChanged = false;
-                } else {
-                    $dm->remove($image);
-                    $dm->flush();
-                    $dm->clear();
-                }
-            }
-        }
+        $md5 = md5_file($fullImagePath);
 
         // Extract appropriate EXIF data
         $dataPid = null;
@@ -161,7 +150,6 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
                 }
             }
         }
-
 
         // Fetch the necessary data from the Datahub
         if($dataPid != null) {
@@ -224,8 +212,11 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
                 $createNew = false;
 
                 // Re-upload the file if the checksums didn't match
-                if($fileChanged) {
-                    $this->uploadToResourceSpace($dm, $md5, $id, $imageName, $fullImagePath, false);
+                if($resourceSpaceData['file_checksum'] != $md5) {
+                    echo 'Replace image ' . $imageName . PHP_EOL;
+                    rename($fullImagePath, $imageWithExtension);
+                    $this->replaceImage($id, realpath($imageWithExtension));
+                    rename($imageWithExtension, $fullImagePath);
                 }
 
                 // Update fields in ResourceSpace where necessary
@@ -248,14 +239,22 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
 
         // Upload a new file and set all metadata fields if this resource doesn't exist yet
         if($createNew) {
-            $newId = $this->uploadToResourceSpace($dm, $md5, -1, $imageName, $fullImagePath, true);
-            foreach($newData as $key => $value) {
-                $this->updateField($newId, $key, $value);
+            echo 'Create new image ' . $imageName . PHP_EOL;
+            rename($fullImagePath, $imageWithExtension);
+            $newId = $this->uploadImage(realpath($imageWithExtension));
+            rename($imageWithExtension, $fullImagePath);
+
+            if(preg_match('/^[0-9]+$/', $newId)) {
+//                echo 'New id ' . $newId . PHP_EOL;
+                foreach ($newData as $key => $value) {
+                    $this->updateField($newId, $key, $value);
+                }
+            }
+            else {
+                echo 'Error: ' . PHP_EOL . $newId . PHP_EOL;
             }
             //TODO log the result if something went wrong
         }
-
-        // Delete the JPEG image we created
     }
 
     private function getCurrentResourceSpaceData()
@@ -265,7 +264,7 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
         $allResources = file_get_contents($url);
 
         if($allResources == 'Invalid signature') {
-            echo 'Error: invalid ResourceSpace API key. Please paste the key found in the ResourceSpace user management into app/config/resourcespace.yml.' . PHP_EOL;
+            echo 'Error: invalid ResourceSpace API key. Please paste the key found in the ResourceSpace user management into app/config/parameters.yml.' . PHP_EOL;
             return NULL;
         }
 
@@ -290,58 +289,6 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
         $url = $this->apiUrl . '?' . $query . '&sign=' . $this->getSign($query);
         $data = file_get_contents($url);
         return $data;
-    }
-
-    private function uploadToResourceSpace($dm, $md5, $id, $imageName, $fullImagePath, $createNew)
-    {
-        $result = -1;
-
-        $pos = strrpos($imageName, '.');
-        if($pos) {
-            $jpegImage = substr($imageName, 0, $pos) . '.jpg';
-        } else {
-            $jpegImage = $imageName . '.jpg';
-        }
-        $imageDimensions = getimagesize($fullImagePath);
-        $imageWidth = $imageDimensions[0];
-        $imageHeight = $imageDimensions[1];
-        try {
-            $imagick = new Imagick($fullImagePath);
-            $maxDimension = $this->getContainer()->getParameter('scale_image_pixels');
-            if($imageWidth > $maxDimension || $imageHeight > $maxDimension) {
-                $imagick->scaleImage($imageWidth >= $imageHeight ? $maxDimension : 0, $imageWidth < $imageHeight ? $maxDimension : 0);
-            }
-            $imagick->setFormat('jpeg');
-            $imagick->writeImage($jpegImage);
-
-            $success = false;
-            if($createNew) {
-                $result = $this->uploadImage(realpath($jpegImage));
-                if($result > -1) {
-                    $success = true;
-                }
-            } else {
-                $success = $this->replaceImage($id, realpath($jpegImage));
-            }
-
-            if($success) {
-                $newImage = new Image();
-                $newImage->setFilename($imageName);
-                $newImage->setHash($md5);
-                $dm->persist($newImage);
-                $dm->flush();
-                $dm->clear();
-            }
-            $imagick->clear();
-
-            if(file_exists($jpegImage)) {
-                unlink($jpegImage);
-            }
-        } catch (Exception $e) {
-            echo $e . PHP_EOL;
-        }
-
-        return $result;
     }
 
     private function uploadImage($image)
