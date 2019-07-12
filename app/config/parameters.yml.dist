@@ -15,7 +15,7 @@ parameters:
     service_address: 'info@vlaamsekunstcollectie.be'
 
     # URL of the OAI-PMH endpoint for metadata harvesting
-    datahub_url: 'http://datahub.box.be/oai'
+    datahub_url: 'https://datahub.iiif.vlaamsekunstcollectie.be/oai'
     datahub_language: 'nl'
 
     # MongoDB connection string & database
@@ -27,14 +27,11 @@ parameters:
     # The location (can be either relative or absolute) where the high-resolutions images are located
     images_folder: '../images/'
 
-    # The maximum size of the image in either direction
-    scale_image_pixels: 1800
-
     # The URL of the Cantaloupe server that serves the images
-    cantaloupe_url: 'http://imagehub.box/iiif/2/'
+    cantaloupe_url: 'https://imagehub.vlaamsekunstcollectie.be/iiif/2/'
 
     # The ResourceSpace API configuration
-    resourcespace_api_url: 'http://resourcespace.box/api'
+    resourcespace_api_url: 'https://ingest.vlaamsekunstcollectie.be/api'
     resourcespace_api_username: 'admin'
     resourcespace_api_key: '704e38da514213bbdc7ad4647cde37aac03821ff621bb077994fe86ac1875c60'
 
@@ -46,4 +43,3 @@ parameters:
 
     # A secret key that's used to generate certain security-related tokens
     secret:            ThisTokenIsNotSoSecretChangeIt
-
