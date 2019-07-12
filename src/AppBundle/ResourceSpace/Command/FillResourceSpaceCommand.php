@@ -27,6 +27,7 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
     private $dataDefinition;
     private $datahubEndpoint;
     private $exifFields;
+    private $verbose;
 
     protected function configure()
     {
@@ -48,6 +49,8 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
         if(!$this->datahubUrl) {
             $this->datahubUrl = $this->getContainer()->getParameter('datahub_url');
         }
+        $this->verbose = $input->getOption('verbose');
+
         $this->datahubLanguage = $this->getContainer()->getParameter('datahub_language');
         $this->namespace = $this->getContainer()->getParameter('datahub_namespace');
         $this->metadataPrefix = $this->getContainer()->getParameter('datahub_metadataprefix');
@@ -126,7 +129,9 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
                 }
 
                 if($isSupportedImage && $isSupportedCompression) {
-                    echo 'Processing ' . $imageName . PHP_EOL;
+                    if($this->verbose) {
+                        echo 'Processing ' . $imageName . PHP_EOL;
+                    }
                     $this->processImage($dm, $imageName, $fullImagePath, $exifData);
                 }
             }
@@ -251,7 +256,9 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
                 foreach($newData as $key => $value) {
                     $update = false;
                     if(!array_key_exists($key, $resourceSpaceData)) {
-                        echo 'No exist field ' . $key . ', ' . $value . PHP_EOL;
+                        if($this->verbose) {
+                            echo 'Field ' . $key . ' does not exist, should be ' . $value . PHP_EOL;
+                        }
                         $update = true;
                     } else if($key == 'keywords') {
                         $explodeVal = explode(',', $value);
@@ -271,20 +278,24 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
                             }
                         }
                         if(!$hasAll) {
-                            echo 'Mismatch field ' . $key . ', len ' . strlen($value) . ' vs ' . strlen($resourceSpaceData[$key]) . PHP_EOL . $value . PHP_EOL . ' vs ' . PHP_EOL . $resourceSpaceData[$key] . PHP_EOL;
+                            if($this->verbose) {
+                                echo 'Mismatching field ' . $key . ', should be ' . $value . ', is ' . $resourceSpaceData[$key] . PHP_EOL;
+                            }
                             $update = true;
                         }
                     } else {
                         if($resourceSpaceData[$key] != $value) {
-                            echo 'Mismatch field ' . $key . ', len ' . strlen($value) . ' vs ' . strlen($resourceSpaceData[$key]) . PHP_EOL . $value . PHP_EOL . ' vs ' . PHP_EOL . $resourceSpaceData[$key] . PHP_EOL;
+                            if($this->verbose) {
+                                echo 'Mismatching field ' . $key . ', should be ' . $value . ', is ' . $resourceSpaceData[$key] . PHP_EOL;
+                            }
                             $update = true;
                         }
                     }
                     if($update) {
-                        echo 'Update field ' . $key . ', ' . $value . PHP_EOL;
                         $result = $this->updateField($id, $key, $value);
                         if($result !== true) {
                             echo 'Error updating field ' . $key . ' for image ' . $imageName . ':' . PHP_EOL . $result . PHP_EOL;
+                            //TODO log when something went wrong
                         }
                     }
                 }
@@ -295,10 +306,18 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
         // Upload a new file and set all metadata fields if this resource doesn't exist yet
         if($createNew) {
             $newId = $this->uploadToResourceSpace($dm, $md5, -1, $imageName, $fullImagePath, true);
-            foreach($newData as $key => $value) {
-                $this->updateField($newId, $key, $value);
+            if(preg_match('/^[0-9]+$/', $newId)) {
+                foreach($newData as $key => $value) {
+                    $result = $this->updateField($newId, $key, $value);
+                    if($result !== true) {
+                        echo 'Error adding field ' . $key . ' for image ' . $imageName . ':' . PHP_EOL . $result . PHP_EOL;
+                        //TODO log the result if something went wrong
+                    }
+                }
+            } else {
+                echo 'Error creating resource ' . $imageName . ': ' . PHP_EOL . $newId . PHP_EOL;
+                //TODO log the result if something went wrong
             }
-            //TODO log the result if something went wrong
         }
     }
 
