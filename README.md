@@ -21,6 +21,7 @@ This project requires following dependencies:
       $ pecl install mongodb
       ```
 * MongoDB >= 3.2.10
+* A local or remote [Datahub](https://github.com/VlaamseKunstcollectie/Datahub) installation
 * A local or remote [ResourceSpace](https://www.resourcespace.com/) installation
 * A local or remote [Cantaloupe](https://cantaloupe-project.github.io/) installation
 
