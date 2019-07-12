@@ -27,6 +27,9 @@ parameters:
     # The location (can be either relative or absolute) where the high-resolutions images are located
     images_folder: '../images/'
 
+    # The maximum size of the image in either direction
+    scale_image_pixels: 1800
+
     # The URL of the Cantaloupe server that serves the images
     cantaloupe_url: 'http://imagehub.box/iiif/2/'
 
