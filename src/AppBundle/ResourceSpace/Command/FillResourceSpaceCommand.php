@@ -293,7 +293,7 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
                     }
                     if($update) {
                         $result = $this->updateField($id, $key, $value);
-                        if($result !== true) {
+                        if($result !== 'true') {
                             echo 'Error updating field ' . $key . ' for image ' . $imageName . ':' . PHP_EOL . $result . PHP_EOL;
                             //TODO log when something went wrong
                         }
@@ -309,7 +309,7 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
             if(preg_match('/^[0-9]+$/', $newId)) {
                 foreach($newData as $key => $value) {
                     $result = $this->updateField($newId, $key, $value);
-                    if($result !== true) {
+                    if($result !== 'true') {
                         echo 'Error adding field ' . $key . ' for image ' . $imageName . ':' . PHP_EOL . $result . PHP_EOL;
                         //TODO log the result if something went wrong
                     }

@@ -5,7 +5,9 @@ parameters:
     # See https://sno.phy.queensu.ca/~phil/exiftool/TagNames/EXIF.html#Compression for a list of all compression types
     supported_compressions:
         # JPEG
-        - 7
+        #- 7
+        # Uncompressed
+        - 1
 
     exif_fields:
         # dataPid is required to fetch the relevant record from the Datahub
