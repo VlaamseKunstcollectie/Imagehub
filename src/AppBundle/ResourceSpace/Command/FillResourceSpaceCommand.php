@@ -58,6 +58,7 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
         $folder = rtrim($folder, '/') . '/';
 
         $supportedExtensions = $this->getContainer()->getParameter('supported_extensions');
+        $supportedCompressions = $this->getContainer()->getParameter('supported_compressions');
 
         // Make sure the API URL does not end with a '?' character
         $this->apiUrl = rtrim($this->getContainer()->getParameter('resourcespace_api_url'), '?');
@@ -84,13 +85,13 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
             }
             try {
                 $isSupportedImage = false;
+                $isSupportedCompression = false;
 
                 if(strpos($imageName, '.') > -1) {
+                    echo 'Error: file ' . $imageName . ' has a filename extension.' . PHP_EOL;
                     //TODO log incorrect filename
                     continue;
                 }
-
-                //TODO check if this image uses JPEG compression
 
 
                 $exifData = exif_read_data($fullImagePath);
@@ -105,11 +106,28 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
                             }
                         }
                     }
+                    if(array_key_exists('Compression', $exifData)) {
+                        foreach ($supportedCompressions as $supportedCompression) {
+                            if ($exifData['Compression'] == $supportedCompression) {
+                                $isSupportedCompression = true;
+                                break;
+                            }
+                        }
+                    }
                 }
-                if ($isSupportedImage) {
-                    $this->processImage($dm, $imageName, $fullImagePath, $exifData);
-                } else {
+
+                if (!$isSupportedImage) {
+                    echo 'Error: file ' . $imageName . ' does not have the correct extension.' . PHP_EOL;
                     // TODO log incorrect file extensions
+                }
+                if(!$isSupportedCompression) {
+                    echo 'Error: file ' . $imageName . ' has the wrong image compression.' . PHP_EOL;
+                    // TODO log incorrect image compression
+                }
+
+                if($isSupportedImage && $isSupportedCompression) {
+                    echo 'Processing ' . $imageName . PHP_EOL;
+                    $this->processImage($dm, $imageName, $fullImagePath, $exifData);
                 }
             }
             catch(Exception $e) {
@@ -175,7 +193,7 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
                 $domDoc->loadXML($data->asXML());
                 $xpath = new DOMXPath($domDoc);
 
-                foreach ($this->dataDefinition as $dataDef) {
+                foreach ($this->dataDefinition as $key => $dataDef) {
                     if(!array_key_exists('field', $dataDef)) {
                         continue;
                     }
@@ -196,7 +214,7 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
                                         if($value == null) {
                                             $value = $extr->nodeValue;
                                         }
-                                        else {
+                                        else if($key != 'keywords' || !in_array($extr->nodeValue, explode(",", $value))) {
                                             $value .= ',' . $extr->nodeValue;
                                         }
                                     }
@@ -205,7 +223,8 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
                         }
                     }
                     if ($value != null) {
-                        $newData[$dataDef['field']] = $value;
+                        // Nginx returns a 301 if the request URL becomes too long, so we need to cut it down
+                        $newData[$dataDef['field']] = trim(strlen($value) > 780 ? substr($value, 0, 780) : $value);
                     }
                 }
             }
@@ -232,14 +251,41 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
                 foreach($newData as $key => $value) {
                     $update = false;
                     if(!array_key_exists($key, $resourceSpaceData)) {
+                        echo 'No exist field ' . $key . ', ' . $value . PHP_EOL;
                         $update = true;
+                    } else if($key == 'keywords') {
+                        $explodeVal = explode(',', $value);
+                        $explodeRS = explode(',', $resourceSpaceData[$key]);
+                        $hasAll = true;
+                        foreach($explodeVal as $val) {
+                            $has = false;
+                            foreach($explodeRS as $rs) {
+                                if($rs == $val) {
+                                    $has = true;
+                                    break;
+                                }
+                            }
+                            if(!$has) {
+                                $hasAll = false;
+                                break;
+                            }
+                        }
+                        if(!$hasAll) {
+                            echo 'Mismatch field ' . $key . ', len ' . strlen($value) . ' vs ' . strlen($resourceSpaceData[$key]) . PHP_EOL . $value . PHP_EOL . ' vs ' . PHP_EOL . $resourceSpaceData[$key] . PHP_EOL;
+                            $update = true;
+                        }
                     } else {
                         if($resourceSpaceData[$key] != $value) {
+                            echo 'Mismatch field ' . $key . ', len ' . strlen($value) . ' vs ' . strlen($resourceSpaceData[$key]) . PHP_EOL . $value . PHP_EOL . ' vs ' . PHP_EOL . $resourceSpaceData[$key] . PHP_EOL;
                             $update = true;
                         }
                     }
                     if($update) {
-                        $this->updateField($id, $key, $value);
+                        echo 'Update field ' . $key . ', ' . $value . PHP_EOL;
+                        $result = $this->updateField($id, $key, $value);
+                        if($result !== true) {
+                            echo 'Error updating field ' . $key . ' for image ' . $imageName . ':' . PHP_EOL . $result . PHP_EOL;
+                        }
                     }
                 }
                 break;
@@ -254,8 +300,6 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
             }
             //TODO log the result if something went wrong
         }
-
-        // Delete the JPEG image we created
     }
 
     private function getCurrentResourceSpaceData()
@@ -265,16 +309,21 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
         $allResources = file_get_contents($url);
 
         if($allResources == 'Invalid signature') {
-            echo 'Error: invalid ResourceSpace API key. Please paste the key found in the ResourceSpace user management into app/config/resourcespace.yml.' . PHP_EOL;
+            echo 'Error: invalid ResourceSpace API key. Please paste the key found in the ResourceSpace user management into app/config/parameters.yml.' . PHP_EOL;
             return NULL;
         }
 
         $resources = json_decode($allResources, true);
-
         $data = array();
         foreach($resources as $resource) {
-            $extracted = array('file_checksum' => $resource['file_checksum']);
+            $extracted = array();
             $currentData = json_decode($this->getResourceInfo($resource['ref']), true);
+            if($currentData == null) {
+                continue;
+            }
+            if(empty($currentData)) {
+                continue;
+            }
             foreach($currentData as $field) {
                 $extracted[$field['name']] = $field['value'];
             }
@@ -306,7 +355,8 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
         $imageWidth = $imageDimensions[0];
         $imageHeight = $imageDimensions[1];
         try {
-            $imagick = new Imagick($fullImagePath);
+            $imagick = new Imagick();
+            $imagick->readImage($fullImagePath);
             $maxDimension = $this->getContainer()->getParameter('scale_image_pixels');
             if($imageWidth > $maxDimension || $imageHeight > $maxDimension) {
                 $imagick->scaleImage($imageWidth >= $imageHeight ? $maxDimension : 0, $imageWidth < $imageHeight ? $maxDimension : 0);
