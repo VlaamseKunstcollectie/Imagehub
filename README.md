@@ -87,9 +87,8 @@ If any of these fields are defined as a drop-down field in ResourceSpace, make s
 
 Before importing the images into ResourceSpace, make sure to append the following lines to config.php inside the includes/ folder of your ResourceSpace installation:
 ```php
-$file_checksums=true;
-$file_checksums_50k = false;
-$file_checksums_offline = false;
+$file_checksums = false;
+$filename_field = NULL;
 ```
 
 ### Adding images to ResourceSpace
