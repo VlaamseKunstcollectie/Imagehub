@@ -47,7 +47,7 @@ have created a user with the right permissions. From the
 commands to create the required artefacts in MongoDB:
 
 ```
-> use datahub_dashboard
+> use imagehub
 > db.createUser(
    {
      user: "imagehubuser",
