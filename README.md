@@ -66,7 +66,7 @@ If you want to run the imagehub for testing or development purposes, execute thi
 $ php bin/console server:run
 ```
 
-Use a browser and Navigate to [http://127.0.0.1:8000](http://127.0.0.1:8000). 
+Use a browser and navigate to [http://127.0.0.1:8000](http://127.0.0.1:8000). 
 You should now see the imagehub homepage.
 
 Refer to the [Symfony setup documentation](https://symfony.com/doc/current/setup/web_server_configuration.html) 
