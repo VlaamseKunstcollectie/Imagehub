@@ -6,18 +6,18 @@ use Symfony\Bundle\FrameworkBundle\Controller\Controller;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Annotation\Route;
 
-class HomeController extends Controller
+class IndexController extends Controller
 {
     /**
-     * @Route("/", name="home")
+     * @Route("/", name="index")
      */
-    public function homeAction(Request $request)
+    public function indexAction(Request $request)
     {
         $dm = $this->get('doctrine_mongodb')->getManager();
         $count = $dm->createQueryBuilder('AppBundle\ImageHub\ManifestBundle\Document\Manifest')->count()->getQuery()->execute();
 
-        return $this->render('home.html.twig', [
-            'current_page' => 'home',
+        return $this->render('index.html.twig', [
+            'current_page' => 'index',
             'documentCount' => $count
         ]);
     }

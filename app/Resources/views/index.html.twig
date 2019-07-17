@@ -1,0 +1,11 @@
+{% extends 'base.html.twig' %}
+
+{% block body %}
+<br>
+<div class="jumbotron">
+    <h1>{{ service_name }}</h1>
+    <p>This ImageHub currently contains {{ documentCount }} IIIF manifests.</p>
+    <p>The ImageHub is an implementation of the <a href="https://iiif.io">IIIF</a> Image API and the IIIF Presentation API by the <a href="{{ service_organisation_website }}">{{ service_organisation }}</a>. Its goal is to serve high-quality images of the collections of Flemish Museums using the IIIF framework. It can be used to populate IIIF viewers in web applications, possibly in conjunction with serving metadata about those images using the <a href="http://datahub.vlaamsekunstcollectie.be">Datahub</a>.</p>
+    <p>This ImageHub is managed by the {{ service_organisation }}. Are you interested in publishing your collections online using IIIF? Contact us via e-mail at <a href="mailto:{{ service_address }}">{{ service_address }}</a>.</p>
+</div>
+{% endblock %}
