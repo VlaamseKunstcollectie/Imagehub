@@ -5,6 +5,12 @@ parameters:
     # Name of the application as shown on the homepage
     service_name: 'ImageHub'
 
+    # Name of the organisation managing the application
+    service_organisation: Vlaamse Kunstcollectie VZW
+
+    # Website of the organisation managing the application
+    service_organisation_website: http://www.vlaamsekunstcollectie.be
+
     # Address of the application, necessary to generate manifest and canvas ID's
     service_url: 'http://imagehub.box/iiif/2/'
 

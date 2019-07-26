@@ -6,15 +6,15 @@ use Symfony\Bundle\FrameworkBundle\Controller\Controller;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Annotation\Route;
 
-class ManualController extends Controller
+class IIIFController extends Controller
 {
     /**
-     * @Route("/manual", name="manual")
+     * @Route("/iiif", name="iiif")
      */
-    public function manualAction(Request $request)
+    public function iiifAction(Request $request)
     {
-        return $this->render('manual.html.twig', [
-            'current_page' => 'manual'
+        return $this->render('iiif.html.twig', [
+            'current_page' => 'iiif'
         ]);
     }
 }
