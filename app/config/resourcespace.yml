@@ -9,6 +9,12 @@ parameters:
         # Uncompressed
         - 1
 
+    localisations:
+        nl: 'nl-BE'
+        en: 'en-GB'
+        de: 'de-DE'
+        fr: 'fr-BE'
+
     exif_fields:
         # dataPid is required to fetch the relevant record from the Datahub
         data_pid:
@@ -25,10 +31,6 @@ parameters:
         mime_type:
             exif: 'MimeType'
             field: 'digitalsourcetype'
-# videosize is only supported for resources of type 'Video'. There does not appear to be any field in the current metadata model to support the file size
-#        file_size:
-#            exif: 'FileSize'
-#            field: 'videosize'
         work_pid:
             exif: 'DocumentName'
             field: 'pidobject'
@@ -44,6 +46,10 @@ parameters:
         date_created:
             exif: 'DateTimeOriginal'
             field: 'datecreatedofimage'
+        # videosize is only supported for resources of type 'Video'. There does not appear to be any field in the current metadata model to support the file size
+        # file_size:
+        #     exif: 'FileSize'
+        #     field: 'videosize'
 
     datahub_languages:
         - nl
@@ -58,6 +64,7 @@ parameters:
         short_description:
             xpath: 'descriptiveMetadata[@xml:lang="{language}"]/objectIdentificationWrap/objectDescriptionWrap/objectDescriptionSet/descriptiveNoteValue'
             field: 'description'
+            label: 'Description'
         creator:
             xpath: 'descriptiveMetadata[@xml:lang="{language}"]/eventWrap/eventSet/event[eventType/term="production"]/eventActor/actorInRole/actor/nameActorSet/appellationValue[@pref="preferred"]'
             field: 'creatorofartworkobje'

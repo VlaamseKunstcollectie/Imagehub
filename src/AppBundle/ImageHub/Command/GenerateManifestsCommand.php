@@ -11,9 +11,11 @@ use Symfony\Bundle\FrameworkBundle\Command\ContainerAwareCommand;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
+use Symfony\Component\Debug\Exception\ContextErrorException;
 
 class GenerateManifestsCommand extends ContainerAwareCommand
 {
+    private $localisations;
     private $serviceUrl;
     private $apiUrl;
     private $apiUsername;
@@ -36,6 +38,8 @@ class GenerateManifestsCommand extends ContainerAwareCommand
     // All image data with the image ID's as key
     private $imageData;
 
+    private $verbose;
+
     protected function configure()
     {
         $this
@@ -51,6 +55,9 @@ class GenerateManifestsCommand extends ContainerAwareCommand
         if(!$this->datahubUrl) {
             $this->datahubUrl = $this->getContainer()->getParameter('datahub_url');
         }
+        $this->verbose = $input->getOption('verbose');
+        // Localisations (nl -> nl-BE, en -> en-GB etc.)
+        $this->localisations = $this->getContainer()->getParameter('localisations');
         // The default Datahub language
         $this->datahubLanguage = $this->getContainer()->getParameter('datahub_language');
         // All supported Datahub languages
@@ -130,10 +137,7 @@ class GenerateManifestsCommand extends ContainerAwareCommand
         foreach($resources as $resource) {
             $currentData = $this->getResourceInfo($resource['ref']);
             $newDatahubData = array(
-                'label'         => '',
-                'attribution'   => '',
                 'related'       => '',
-                'description'   => '',
                 'data_pid'      => '',
                 'related_works' => array(),
                 'image_ids'     => array()
@@ -191,7 +195,7 @@ class GenerateManifestsCommand extends ContainerAwareCommand
                 $this->imageData[$imageId]['height'] = $data->height;
                 $this->imageData[$imageId]['width'] = $data->width;
             } catch(Exception $e) {
-                echo $e->getMessage();
+                echo $e->getMessage() . PHP_EOL;
                 // TODO proper error reporting
             }
         }
@@ -210,12 +214,20 @@ class GenerateManifestsCommand extends ContainerAwareCommand
                 }
                 catch(Exception $e) {
                     unset($this->imagehubData[$dataPid]);
-                    echo $e . PHP_EOL;
+                    if($this->verbose) {
+                        echo $e . PHP_EOL;
+                    } else {
+                        echo $e->getMessage() . PHP_EOL;
+                    }
                 }
             }
         }
         catch(Exception $e) {
-            echo $e . PHP_EOL;
+            if($this->verbose) {
+                echo $e . PHP_EOL;
+            } else {
+                echo $e->getMessage() . PHP_EOL;
+            }
         }
     }
 
@@ -287,10 +299,7 @@ class GenerateManifestsCommand extends ContainerAwareCommand
                         // We're mostly just interested in its related works
                         if(!array_key_exists($relatedDataPid, $this->imagehubData)) {
                             $newDatahubData = array(
-                                'label'         => '',
-                                'attribution'   => '',
                                 'related'       => '',
-                                'description'   => '',
                                 'data_pid'      => $relatedDataPid,
                                 'related_works' => array(),
                                 'image_ids'     => array(),
@@ -308,7 +317,7 @@ class GenerateManifestsCommand extends ContainerAwareCommand
         $this->imagehubData[$dataPid]['metadata'] = array();
         foreach($this->datahubLanguages as $language) {
             foreach ($this->dataDefinition as $key => $dataDef) {
-                if(!array_key_exists('label', $dataDef) && $key != 'short_description') {
+                if(!array_key_exists('label', $dataDef)) {
                     continue;
                 }
                 $query = $this->buildXpath($dataDef['xpath'], $language);
@@ -329,16 +338,6 @@ class GenerateManifestsCommand extends ContainerAwareCommand
                             $this->imagehubData[$dataPid]['metadata'][$dataDef['label']] = array();
                         }
                         $this->imagehubData[$dataPid]['metadata'][$dataDef['label']][$language] = $value;
-                    }
-                    // Add manifest-level metadata (label, attribution, description)
-                    if($language == $this->datahubLanguage) {
-                        if ($key == 'title') {
-                            $this->imagehubData[$dataPid]['label'] = $value;
-                        } else if($key == 'publisher') {
-                            $this->imagehubData[$dataPid]['attribution'] = $value;
-                        } else if($key == 'short_description') {
-                            $this->imagehubData[$dataPid]['description'] = $value;
-                        }
                     }
                 }
             }
@@ -519,16 +518,33 @@ class GenerateManifestsCommand extends ContainerAwareCommand
             }
 
             $data = $this->imagehubData[$dataPid];
+            $label = array();
+            $description = array();
+            $attribution = array();
 
             // Fill in (multilingual) manifest data
             $manifestMetadata = array();
             foreach($data['metadata'] as $key => $metadata) {
                 $arr = array();
                 foreach($metadata as $language => $value) {
+                    // Change nl into nl-BE, en into en-GB, etc.
+                    if(array_key_exists($language, $this->localisations)) {
+                        $language = $this->localisations[$language];
+                    }
                     $arr[] = array(
                         '@language' => $language,
                         '@value'    => $value
                     );
+                }
+                // Grab the values for the top-level description, label and attribution
+                if($key == 'Description') {
+                    $description = $arr;
+                    // Description is not included in the metadata field
+                    continue;
+                } else if($key == 'Title') {
+                    $label = $arr;
+                } else if($key == 'Credit Line') {
+                    $attribution = $arr;
                 }
                 $manifestMetadata[] = array(
                     'label' => $key,
@@ -613,10 +629,10 @@ class GenerateManifestsCommand extends ContainerAwareCommand
                 '@context'         => 'http://iiif.io/api/presentation/2/context.json',
                 '@type'            => 'sc:Manifest',
                 '@id'              => $manifestId,
-                'label'            => $data['label'],
-                'attribution'      => $data['attribution'],
+                'label'            => $label,
+                'attribution'      => $attribution,
                 'related'          => $data['related'],
-                'description'      => empty($data['description']) ? 'n/a' : $data['description'],
+                'description'      => empty($description) ? 'n/a' : $description,
                 'metadata'         => $manifestMetadata,
                 'viewingDirection' => 'left-to-right',
                 'viewingHint'      => 'individuals',
@@ -631,20 +647,21 @@ class GenerateManifestsCommand extends ContainerAwareCommand
             $dm->flush();
 
 
-            // Validate the manifest and remove if invalid
+            // Validate the manifest
+            // We can only pass a URL to the validator, so the manifest needs to be stored and served already before validation
+            // If it does not pass validation, remove from the database
             if($validate) {
                 try {
                     $validatorJsonResult = file_get_contents($validatorUrl . $manifestId);
                     $validatorResult = json_decode($validatorJsonResult);
                     $okay = $validatorResult->okay == 1;
                     if (!empty($validatorResult->warnings)) {
-                        $okay = false;
                         foreach ($validatorResult->warnings as $warning) {
                             echo 'Manifest ' . $dataPid . ' warning: ' . $warning . PHP_EOL;
                         }
                     }
                     if (!empty($validatorResult->error)) {
-                        if($validatorResult->error != 'None') {
+                        if ($validatorResult->error != 'None') {
                             $okay = false;
                             echo 'Manifest ' . $dataPid . ' error: ' . $validatorResult->error . PHP_EOL;
                         }
@@ -655,7 +672,11 @@ class GenerateManifestsCommand extends ContainerAwareCommand
                         $dm->flush();
                     }
                 } catch (Exception $e) {
-                    echo 'Error validating manifest ' . $dataPid . ': ' . $e . PHP_EOL;
+                    if($this->verbose) {
+                        echo 'Error validating manifest ' . $dataPid . ': ' . $e . PHP_EOL;
+                    } else {
+                        echo 'Error validating manifest ' . $dataPid . ': ' . $e->getMessage() . PHP_EOL;
+                    }
                 }
             }
             $dm->clear();
