@@ -20,9 +20,13 @@ parameters:
     # Email address where the admin of the application can be reached
     service_address: 'info@vlaamsekunstcollectie.be'
 
-    # URL of the OAI-PMH endpoint for metadata harvesting
-    datahub_url: 'http://datahub.box/oai'
+    # URL of the OAI-PMH endpoint for metadata harvesting & REST API to update records
+    datahub_url: 'http://datahub.box'
     datahub_language: 'nl'
+    datahub_username: 'admin'
+    datahub_password: 'datahub'
+    datahub_public_id: 'slightlylesssecretpublicid'
+    datahub_secret: 'supersecretpassphrase'
 
     # MongoDB connection string & database
     mongodb_server: mongodb://127.0.0.1:27017/imagehub

@@ -27,9 +27,17 @@ class GenerateManifestsCommand extends ContainerAwareCommand
     private $metadataPrefix;
     private $dataDefinition;
     private $datahubEndpoint;
+    private $datahubUsername;
+    private $datahubPassword;
+    private $datahubPublicId;
+    private $datahubSecret;
+
+    // The Datahub token, requested during the first Datahub REST API call and reused for each API call after
+    private $datahubToken;
+
     private $cantaloupeUrl;
 
-    //The data PID's we want to generate manifests for
+    // The data PID's we want to generate manifests for
     private $dataPids;
 
     // All datahub data with the data PID's as key
@@ -39,6 +47,11 @@ class GenerateManifestsCommand extends ContainerAwareCommand
     private $imageData;
 
     private $verbose;
+
+    // List of Datahub DOM documents and Xpath objects linked to these documents
+    // These are created when requesting records from the Datahub and reused for inserting manifest and thumbnail URL's
+    private $domDocs = array();
+    private $xpaths = array();
 
     protected function configure()
     {
@@ -55,7 +68,14 @@ class GenerateManifestsCommand extends ContainerAwareCommand
         if(!$this->datahubUrl) {
             $this->datahubUrl = $this->getContainer()->getParameter('datahub_url');
         }
+        // Username, password, public ID and secret for datahub PUT requests
+        $this->datahubUsername = $this->getContainer()->getParameter('datahub_username');
+        $this->datahubPassword = $this->getContainer()->getParameter('datahub_password');
+        $this->datahubPublicId = $this->getContainer()->getParameter('datahub_public_id');
+        $this->datahubSecret = $this->getContainer()->getParameter('datahub_secret');
+
         $this->verbose = $input->getOption('verbose');
+
         // Localisations (nl -> nl-BE, en -> en-GB etc.)
         $this->localisations = $this->getContainer()->getParameter('localisations');
         // The default Datahub language
@@ -68,7 +88,8 @@ class GenerateManifestsCommand extends ContainerAwareCommand
         $this->dataDefinition = $this->getContainer()->getParameter('datahub_data_definition');
         $this->exifFields = $this->getContainer()->getParameter('exif_fields');
 
-        $this->serviceUrl = $this->getContainer()->getParameter('service_url');
+        // Make sure the service URL name ends with a trailing slash
+        $this->serviceUrl = rtrim($this->getContainer()->getParameter('service_url'), '/') . '/';
 
         // Make sure the API URL does not end with a '?' character
         $this->apiUrl = rtrim($this->getContainer()->getParameter('resourcespace_api_url'), '?');
@@ -155,6 +176,10 @@ class GenerateManifestsCommand extends ContainerAwareCommand
                 }
             }
 
+            if($this->verbose) {
+                echo 'Retrieved ' . $dataPid . ' from ResourceSpace' . PHP_EOL;
+            }
+
             $newDatahubData['manifest_id'] = $this->extractManifestId($dataPid);
 
             // Add related works if this dataPid is already present in the image data
@@ -194,6 +219,9 @@ class GenerateManifestsCommand extends ContainerAwareCommand
                 $data = json_decode($jsonData);
                 $this->imageData[$imageId]['height'] = $data->height;
                 $this->imageData[$imageId]['width'] = $data->width;
+                if($this->verbose) {
+                    echo 'Retrieved image ' . $imageId . ' from Cantaloupe' . PHP_EOL;
+                }
             } catch(Exception $e) {
                 echo $e->getMessage() . PHP_EOL;
                 // TODO proper error reporting
@@ -206,11 +234,14 @@ class GenerateManifestsCommand extends ContainerAwareCommand
         try {
             // Fetch the necessary data from the Datahub
             if (!$this->datahubEndpoint)
-                $this->datahubEndpoint = Endpoint::build($this->datahubUrl);
+                $this->datahubEndpoint = Endpoint::build($this->datahubUrl . '/oai');
 
             foreach($this->imagehubData as $dataPid => $value) {
                 try {
                     $this->addDatahubDataToImage($dataPid);
+                    if($this->verbose) {
+                        echo 'Added Datahub data to ' . $dataPid . PHP_EOL;
+                    }
                 }
                 catch(Exception $e) {
                     unset($this->imagehubData[$dataPid]);
@@ -236,6 +267,8 @@ class GenerateManifestsCommand extends ContainerAwareCommand
         $record = $this->datahubEndpoint->getRecord($dataPid, $this->metadataPrefix);
         $data = $record->GetRecord->record->metadata->children($this->namespace, true);
         $domDoc = new DOMDocument;
+        $domDoc->preserveWhiteSpace = false;
+        $domDoc->formatOutput = true;
         $domDoc->loadXML($data->asXML());
         $xpath = new DOMXPath($domDoc);
 
@@ -342,6 +375,9 @@ class GenerateManifestsCommand extends ContainerAwareCommand
                 }
             }
         }
+
+        $this->domDocs[$dataPid] = $domDoc;
+        $this->xpaths[$dataPid] = $xpath;
     }
 
     private function addAllRelations()
@@ -511,6 +547,8 @@ class GenerateManifestsCommand extends ContainerAwareCommand
         $validate = $this->getContainer()->getParameter('validate_manifests');
         $validatorUrl = $this->getContainer()->getParameter('validator_url');
 
+        // Top-level collection containing a link to all manifests
+        $manifests = array();
 
         foreach($this->dataPids as $dataPid) {
             if(!array_key_exists($dataPid, $this->imagehubData)) {
@@ -556,21 +594,27 @@ class GenerateManifestsCommand extends ContainerAwareCommand
             $canvases = array();
             $index = 0;
             $startCanvas = null;
+            $thumbnail = null;
 
             // Loop through all works related to this data PID (including itself)
             foreach($data['related_works'] as $relatedDataPid => $relatedData) {
+
+                // When the related data pid is the data pid of the record we're currently processing,
+                // we know that this canvas is in fact the main canvas
                 $isStartCanvas = $relatedDataPid == $dataPid;
 
                 // Loop through all image ID's linked to this data PID
                 foreach($this->imagehubData[$relatedDataPid]['image_ids'] as $imageId) {
                     $index++;
                     $canvasId = $this->serviceUrl . $data['manifest_id'] . '/canvas/' . $index . '.json';
+                    $serviceId = $this->serviceUrl . $imageId;
                     if($isStartCanvas && $startCanvas == null) {
                         $startCanvas = $canvasId;
+                        $thumbnail = $serviceId;
                     }
                     $service = array(
                         '@context' => 'http://iiif.io/api/image/2/context.json',
-                        '@id'      => $this->serviceUrl . $imageId,
+                        '@id'      => $serviceId,
                         'profile'  => 'http://iiif.io/api/image/2/level2.json'
                     );
                     $resource = array(
@@ -650,36 +694,238 @@ class GenerateManifestsCommand extends ContainerAwareCommand
             // Validate the manifest
             // We can only pass a URL to the validator, so the manifest needs to be stored and served already before validation
             // If it does not pass validation, remove from the database
+            $valid = true;
             if($validate) {
-                try {
-                    $validatorJsonResult = file_get_contents($validatorUrl . $manifestId);
-                    $validatorResult = json_decode($validatorJsonResult);
-                    $okay = $validatorResult->okay == 1;
-                    if (!empty($validatorResult->warnings)) {
-                        foreach ($validatorResult->warnings as $warning) {
-                            echo 'Manifest ' . $dataPid . ' warning: ' . $warning . PHP_EOL;
-                        }
-                    }
-                    if (!empty($validatorResult->error)) {
-                        if ($validatorResult->error != 'None') {
-                            $okay = false;
-                            echo 'Manifest ' . $dataPid . ' error: ' . $validatorResult->error . PHP_EOL;
-                        }
-                    }
-                    if (!$okay) {
-                        echo 'Manifest ' . $dataPid . ' is not valid.' . PHP_EOL;
-                        $dm->remove($manifestDocument);
-                        $dm->flush();
-                    }
-                } catch (Exception $e) {
-                    if($this->verbose) {
-                        echo 'Error validating manifest ' . $dataPid . ': ' . $e . PHP_EOL;
-                    } else {
-                        echo 'Error validating manifest ' . $dataPid . ': ' . $e->getMessage() . PHP_EOL;
-                    }
+                $valid = $this->validateManifest($validatorUrl, $manifestId);
+                if (!$valid) {
+                    echo 'Manifest ' . $manifestId . ' is not valid.' . PHP_EOL;
+                    $dm->remove($manifestDocument);
+                    $dm->flush();
                 }
             }
             $dm->clear();
+
+            if($valid) {
+                if($this->verbose) {
+                    echo 'Generated manifest ' . $manifestId . ' for data pid ' . $dataPid . PHP_EOL;
+                }
+
+                // Add to manifests array to add to the top-level collection
+                $manifests[] = array(
+                    '@id' => $manifestId,
+                    '@type' => 'sc:Manifest',
+                    'label' => $label
+                );
+
+                // Update the LIDO data to include the manifest and thumbnail
+                $this->addManifestAndThumbnailToLido($this->namespace, $dataPid, $manifestId, $thumbnail);
+            }
         }
+
+        // Generate the top-level collection and store it in mongoDB
+        $collectionId = $this->serviceUrl . 'collection/top';
+        $collection = array(
+            '@context' => 'http://iiif.io/api/presentation/2/context.json',
+            '@id' => $collectionId,
+            '@type' => 'sc:Collection',
+            'label' => 'Top Level Collection for Imagehub',
+            'viewingHint' => 'top',
+            'description' => 'This collection lists all the IIIF manifests available in this Imagehub instance',
+            'manifests' => $manifests
+        );
+        $manifestDocument = new Manifest();
+        $manifestDocument->setManifestId($collectionId);
+        $manifestDocument->setData(json_encode($collection));
+        $dm->persist($manifestDocument);
+        $dm->flush();
+
+        $valid = true;
+        if($validate) {
+            $valid = $this->validateManifest($validatorUrl, $collectionId);
+            if (!$valid) {
+                echo 'Top-level collection ' . $collectionId . ' is not valid.' . PHP_EOL;
+                $dm->remove($manifestDocument);
+                $dm->flush();
+            }
+        }
+        $dm->clear();
+
+        if($valid && $this->verbose) {
+            echo 'Created and stored top-level collection' . PHP_EOL;
+        }
+    }
+
+    private function validateManifest($validatorUrl, $manifestId)
+    {
+        $valid = true;
+        try {
+            $validatorJsonResult = file_get_contents($validatorUrl . $manifestId);
+            $validatorResult = json_decode($validatorJsonResult);
+            $valid = $validatorResult->okay == 1;
+            if (!empty($validatorResult->warnings)) {
+                foreach ($validatorResult->warnings as $warning) {
+                    // Validator warnings always end with a newline, so no need to append one here
+                    echo 'Manifest ' . $manifestId . ' warning: ' . $warning;
+                }
+            }
+            if (!empty($validatorResult->error)) {
+                if ($validatorResult->error != 'None') {
+                    $valid = false;
+                    echo 'Manifest ' . $manifestId . ' error: ' . $validatorResult->error . PHP_EOL;
+                }
+            }
+        } catch (Exception $e) {
+            if($this->verbose) {
+                echo 'Error validating manifest ' . $manifestId . ': ' . $e . PHP_EOL;
+            } else {
+                echo 'Error validating manifest ' . $manifestId . ': ' . $e->getMessage() . PHP_EOL;
+            }
+        }
+        return $valid;
+    }
+
+    private function addManifestAndThumbnailToLido($namespace, $dataPid, $manifestUrl, $thumbnail)
+    {
+        if(!array_key_exists($dataPid, $this->domDocs) || !array_key_exists($dataPid, $this->xpaths)) {
+            return;
+        }
+        $domDoc = $this->domDocs[$dataPid];
+        $xpath = $this->xpaths[$dataPid];
+
+        $query = 'descendant::lido:administrativeMetadata';
+        $administrativeMetadatas = $xpath->query($query);
+        foreach($administrativeMetadatas as $administrativeMetadata) {
+
+            $resourceWrap = null;
+            foreach($administrativeMetadata->childNodes as $childNode) {
+                if ($childNode->nodeName == $namespace . ':resourceWrap') {
+                    $resourceWrap = $childNode;
+
+                    $domElemsToRemove = array();
+                    // Remove any resourceSets that already contain a manifest URL
+                    foreach($childNode->childNodes as $resourceSet) {
+                        if($resourceSet->nodeName == $namespace . ':resourceSet') {
+                            $remove = false;
+                            foreach($resourceSet->childNodes as $resource) {
+                                if($resource->getAttribute($namespace . ':source') == 'Imagehub') {
+                                    $remove = true;
+                                    break;
+                                }
+                            }
+                            if($remove) {
+                                $domElemsToRemove[] = $resourceSet;
+                            }
+                        }
+                    }
+                    foreach($domElemsToRemove as $resourceSet) {
+                        $childNode->removeChild($resourceSet);
+                    }
+                    break;
+                }
+            }
+
+            if ($resourceWrap == null) {
+                $resourceWrap = $domDoc->createElement($namespace . ':resourceWrap');
+                $administrativeMetadata->appendChild($resourceWrap);
+            }
+
+            // Add manifest URL to the administrative metadata
+            $resourceSet = $domDoc->createElement($namespace . ':resourceSet');
+            $resourceWrap->appendChild($resourceSet);
+
+            $resourceId = $domDoc->createElement($namespace . ':resourceID');
+            $resourceId->setAttribute($namespace . ':type', 'purl');
+            $resourceId->setAttribute($namespace . ':source', 'Imagehub');
+            $resourceId->nodeValue = $manifestUrl;
+            $resourceSet->appendChild($resourceId);
+
+            $resourceType = $domDoc->createElement($namespace . ':resourceType');
+            $resourceSet->appendChild($resourceType);
+            $term = $domDoc->createElement($namespace . ':term');
+            $term->setAttribute($namespace . ':pref', 'preferred');
+            $term->nodeValue = 'IIIF Manifest';
+            $resourceType->appendChild($term);
+
+            $resourceSource = $domDoc->createElement($namespace . ':resourceSource');
+            $resourceSet->appendChild($resourceSource);
+            $legalBodyName = $domDoc->createElement($namespace . ':legalBodyName');
+            $resourceSource->appendChild($legalBodyName);
+            $appellationValue = $domDoc->createElement($namespace . ':appellationValue');
+            // Hardcoded value
+            $appellationValue->nodeValue = 'Vlaamse Kunstcollectie VZW';
+            $legalBodyName->appendChild($appellationValue);
+
+            // Add thumbnail to the administrative metadata
+            $resourceSet = $domDoc->createElement($namespace . ':resourceSet');
+            $resourceWrap->appendChild($resourceSet);
+
+            $resourceId = $domDoc->createElement($namespace . ':resourceID');
+            $resourceId->setAttribute($namespace . ':type', 'purl');
+            $resourceId->setAttribute($namespace . ':source', 'Imagehub');
+            $resourceId->nodeValue = $thumbnail;
+            $resourceSet->appendChild($resourceId);
+
+            $resourceType = $domDoc->createElement($namespace . ':resourceType');
+            $resourceSet->appendChild($resourceType);
+            $term = $domDoc->createElement($namespace . ':term');
+            $term->setAttribute($namespace . ':pref', 'preferred');
+            $term->nodeValue = 'thumbnail';
+            $resourceType->appendChild($term);
+        }
+
+        if($this->datahubToken == null) {
+            $this->initializeDatahubToken();
+        }
+
+        $this->updateDatahubRecord($dataPid, $domDoc->saveXML());
+    }
+
+    private function initializeDatahubToken()
+    {
+        $ch = curl_init();
+        curl_setopt($ch,CURLOPT_URL, $this->datahubUrl . '/oauth/v2/token');
+        curl_setopt($ch,CURLOPT_POST, true);
+        curl_setopt($ch,CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch,CURLOPT_POSTFIELDS,
+            'grant_type=password&username=' . urlencode($this->datahubUsername)
+            . '&password=' . urlencode($this->datahubPassword)
+            . '&client_id=' . urlencode($this->datahubPublicId)
+            . '&client_secret=' . urlencode($this->datahubSecret)
+        );
+
+        $resultJson = curl_exec($ch);
+        curl_close($ch);
+
+        $result = json_decode($resultJson);
+        $this->datahubToken = $result->access_token;
+        if($this->verbose) {
+            echo 'Datahub token: ' . $this->datahubToken . PHP_EOL;
+        }
+    }
+
+    private function updateDatahubRecord($dataPid, $xmlData)
+    {
+        $ch = curl_init();
+        curl_setopt($ch,CURLOPT_URL, $this->datahubUrl . '/api/v1/data/' . $dataPid . '.lidoxml');
+        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "PUT");
+        curl_setopt($ch,CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch,CURLOPT_POSTFIELDS, $xmlData);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, array(
+                'Content-Type: application/lido+xml',
+                'Content-Length: ' . strlen($xmlData),
+                'Authorization: Bearer ' . $this->datahubToken
+            )
+        );
+
+        $result = curl_exec($ch);
+
+        $responseCode = curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+        if(!empty($result) || $responseCode != 204) {
+            echo 'Error updating Datahub record ' . $dataPid . ': ' . PHP_EOL . $result . PHP_EOL;
+        } else if($this->verbose) {
+            echo 'Updated Datahub record ' . $dataPid . PHP_EOL;
+        }
+
+        curl_close($ch);
     }
 }
