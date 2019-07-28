@@ -56,3 +56,27 @@ p {
 	padding: 48px 60px;
 	margin-bottom: 30px;
 }
+
+/* Sticky footer */
+
+/* Wrapper for page content to push down footer */
+#wrap {
+  min-height: 100vh;
+  /* Negative indent footer by its height */
+  margin: 0 auto -40px;
+}
+
+/* Set the fixed height of the footer here */
+#push,
+#footer {
+  height: 40px;
+}
+
+#footer {
+  background-color: #f5f5f5;
+}
+
+#footer p {
+  margin: 5px auto;
+}
+
