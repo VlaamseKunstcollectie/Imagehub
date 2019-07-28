@@ -40,6 +40,8 @@ twig:
         locales: '%app.locales%'
         service_name: '%service_name%'
         service_address: '%service_address%'
+        service_organisation: '%service_organisation%'
+        service_organisation_website: '%service_organisation_website%'
 
 # Doctrine Configuration
 doctrine_mongodb:
