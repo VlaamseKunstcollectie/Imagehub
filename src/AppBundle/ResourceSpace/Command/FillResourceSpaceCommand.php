@@ -78,6 +78,7 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
 
         // Loop through all files in the folder
         $imageFiles = scandir($folder);
+        $totalImages = 0;
         foreach ($imageFiles as $imageName) {
             if($imageName == '.' || $imageName == '..') {
                 continue;
@@ -133,11 +134,15 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
                         echo 'Processing ' . $imageName . PHP_EOL;
                     }
                     $this->processImage($dm, $imageName, $fullImagePath, $exifData);
+                    $totalImages++;
                 }
             }
             catch(Exception $e) {
                 echo $e . PHP_EOL;
             }
+        }
+        if($this->verbose) {
+            echo 'Done, processed ' . $totalImages . ' total images' . PHP_EOL;
         }
     }
 
@@ -239,6 +244,8 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
             catch(HttpException $e) {
                 echo 'Image ' . $fullImagePath . ' error: ' . $e . PHP_EOL;
             }
+        } else {
+            echo 'Error: no data pid set on image ' . $fullImagePath . PHP_EOL;
         }
 
         $createNew = true;
@@ -253,6 +260,7 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
                 }
 
                 // Update fields in ResourceSpace where necessary
+                $updatedFields = 0;
                 foreach($newData as $key => $value) {
                     $update = false;
                     if(!array_key_exists($key, $resourceSpaceData)) {
@@ -296,7 +304,18 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
                         if($result !== 'true') {
                             echo 'Error updating field ' . $key . ' for image ' . $imageName . ':' . PHP_EOL . $result . PHP_EOL;
                             //TODO log when something went wrong
+                        } else {
+                            $updatedFields++;
                         }
+                    }
+                }
+                if($this->verbose) {
+                    if($fileChanged && $updatedFields > 0) {
+                        echo 'Replaced image ' . $fullImagePath . ', updated ' . $updatedFields . ' fields' . PHP_EOL;
+                    } else if($fileChanged) {
+                        echo 'Replaced image ' . $fullImagePath . PHP_EOL;
+                    } else if($updatedFields > 0) {
+                        echo 'Updated ' . $updatedFields . ' fields for image ' . $fullImagePath . PHP_EOL;
                     }
                 }
                 break;
@@ -307,12 +326,18 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
         if($createNew) {
             $newId = $this->uploadToResourceSpace($dm, $md5, -1, $imageName, $fullImagePath, true);
             if(preg_match('/^[0-9]+$/', $newId)) {
+                $fieldsAdded = 0;
                 foreach($newData as $key => $value) {
                     $result = $this->updateField($newId, $key, $value);
                     if($result !== 'true') {
                         echo 'Error adding field ' . $key . ' for image ' . $imageName . ':' . PHP_EOL . $result . PHP_EOL;
                         //TODO log the result if something went wrong
+                    } else {
+                        $fieldsAdded++;
                     }
+                }
+                if($this->verbose) {
+                    echo 'Uploaded image ' . $fullImagePath . ' to ResourceSpace, added ' . $fieldsAdded . ' fields' . PHP_EOL;
                 }
             } else {
                 echo 'Error creating resource ' . $imageName . ': ' . PHP_EOL . $newId . PHP_EOL;
