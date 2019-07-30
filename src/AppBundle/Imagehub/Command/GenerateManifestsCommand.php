@@ -750,8 +750,11 @@ class GenerateManifestsCommand extends ContainerAwareCommand
         }
         $dm->clear();
 
-        if($valid && $this->verbose) {
-            echo 'Created and stored top-level collection' . PHP_EOL;
+        if($this->verbose) {
+            if ($valid) {
+                echo 'Created and stored top-level collection' . PHP_EOL;
+            }
+            echo 'Done, created and stored ' . $manifests . ' manifests.' . PHP_EOL;
         }
     }
 
