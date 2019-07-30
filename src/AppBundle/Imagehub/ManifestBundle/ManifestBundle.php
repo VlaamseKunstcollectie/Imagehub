@@ -1,6 +1,6 @@
 <?php
 
-namespace AppBundle\ImageHub\ManifestBundle;
+namespace AppBundle\Imagehub\ManifestBundle;
 
 use Symfony\Component\HttpKernel\Bundle\Bundle;
 

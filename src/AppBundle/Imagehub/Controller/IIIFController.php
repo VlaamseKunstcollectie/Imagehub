@@ -1,6 +1,6 @@
 <?php
 
-namespace AppBundle\ImageHub\Controller;
+namespace AppBundle\Imagehub\Controller;
 
 use Symfony\Bundle\FrameworkBundle\Controller\Controller;
 use Symfony\Component\HttpFoundation\Request;

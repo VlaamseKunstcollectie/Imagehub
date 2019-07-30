@@ -3,7 +3,7 @@
 # https://symfony.com/doc/current/best_practices/configuration.html#infrastructure-related-configuration
 parameters:
     # Name of the application as shown on the homepage
-    service_name: 'ImageHub'
+    service_name: 'Imagehub'
 
     # Name of the organisation managing the application
     service_organisation: Vlaamse Kunstcollectie VZW

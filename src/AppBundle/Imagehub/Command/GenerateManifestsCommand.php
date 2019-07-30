@@ -1,8 +1,8 @@
 <?php
-namespace AppBundle\ImageHub\Command;
+namespace AppBundle\Imagehub\Command;
 
-use AppBundle\ImageHub\CanvasBundle\Document\Canvas;
-use AppBundle\ImageHub\ManifestBundle\Document\Manifest;
+use AppBundle\Imagehub\CanvasBundle\Document\Canvas;
+use AppBundle\Imagehub\ManifestBundle\Document\Manifest;
 use DOMDocument;
 use DOMXPath;
 use Exception;
@@ -507,7 +507,7 @@ class GenerateManifestsCommand extends ContainerAwareCommand
                 }
 
                 // Sort related works based on sort_order
-                uasort($this->imagehubData[$dataPid]['related_works'], array('AppBundle\ImageHub\Command\GenerateManifestsCommand', 'sortRelatedWorks'));
+                uasort($this->imagehubData[$dataPid]['related_works'], array('AppBundle\Imagehub\Command\GenerateManifestsCommand', 'sortRelatedWorks'));
             }
         }
     }

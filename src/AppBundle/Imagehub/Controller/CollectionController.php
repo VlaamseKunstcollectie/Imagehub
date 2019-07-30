@@ -1,6 +1,6 @@
 <?php
 
-namespace AppBundle\ImageHub\Controller;
+namespace AppBundle\Imagehub\Controller;
 
 use Symfony\Bundle\FrameworkBundle\Controller\Controller;
 use Symfony\Component\HttpFoundation\Request;
@@ -18,7 +18,7 @@ class CollectionController extends Controller
         $baseUrl = rtrim($this->getParameter('service_url'), '/') . '/';
 
         $dm = $this->get('doctrine_mongodb')->getManager();
-        $manifests = $dm->createQueryBuilder('AppBundle\ImageHub\ManifestBundle\Document\Manifest')->field('manifestId')->equals($baseUrl . 'collection/top')->getQuery()->execute();
+        $manifests = $dm->createQueryBuilder('AppBundle\Imagehub\ManifestBundle\Document\Manifest')->field('manifestId')->equals($baseUrl . 'collection/top')->getQuery()->execute();
         $toServe = 'Sorry, the requested document does not exist.';
         if(count($manifests) > 0) {
             foreach($manifests as $manifest) {

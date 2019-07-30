@@ -20,8 +20,8 @@ class AppKernel extends Kernel
             new Doctrine\Bundle\MongoDBBundle\DoctrineMongoDBBundle(),
 
             new AppBundle\ResourceSpace\ImageBundle\ImageBundle(),
-            new AppBundle\ImageHub\ManifestBundle\ManifestBundle(),
-            new AppBundle\ImageHub\CanvasBundle\CanvasBundle()
+            new AppBundle\Imagehub\ManifestBundle\ManifestBundle(),
+            new AppBundle\Imagehub\CanvasBundle\CanvasBundle()
         ];
 
         if (in_array($this->getEnvironment(), ['dev', 'test'], true)) {

@@ -1,6 +1,6 @@
 <?php
 
-namespace AppBundle\ImageHub\Controller;
+namespace AppBundle\Imagehub\Controller;
 
 use Symfony\Bundle\FrameworkBundle\Controller\Controller;
 use Symfony\Component\HttpFoundation\Request;
@@ -14,7 +14,7 @@ class IndexController extends Controller
     public function indexAction(Request $request)
     {
         $dm = $this->get('doctrine_mongodb')->getManager();
-        $count = $dm->createQueryBuilder('AppBundle\ImageHub\ManifestBundle\Document\Manifest')->count()->getQuery()->execute();
+        $count = $dm->createQueryBuilder('AppBundle\Imagehub\ManifestBundle\Document\Manifest')->count()->getQuery()->execute();
 
         return $this->render('index.html.twig', [
             'current_page' => 'index',

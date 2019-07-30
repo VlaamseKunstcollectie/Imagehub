@@ -1,6 +1,6 @@
 <?php
 
-namespace AppBundle\ImageHub\ManifestBundle\Document;
+namespace AppBundle\Imagehub\ManifestBundle\Document;
 
 use Doctrine\ODM\MongoDB\Mapping\Annotations as ODM;
 

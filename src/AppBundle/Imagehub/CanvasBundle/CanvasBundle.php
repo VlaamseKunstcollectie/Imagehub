@@ -1,6 +1,6 @@
 <?php
 
-namespace AppBundle\ImageHub\CanvasBundle;
+namespace AppBundle\Imagehub\CanvasBundle;
 
 use Symfony\Component\HttpKernel\Bundle\Bundle;
 

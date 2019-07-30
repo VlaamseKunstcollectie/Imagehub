@@ -1,28 +1,27 @@
 <?php
 
-namespace AppBundle\ImageHub\Controller;
+namespace AppBundle\Imagehub\Controller;
 
 use Symfony\Bundle\FrameworkBundle\Controller\Controller;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
 
-class ManifestController extends Controller
+class CanvasController extends Controller
 {
     /**
-     * @Route("/iiif/2/{manifestId}/manifest.json", name="manifest")
+     * @Route("/iiif/2/{manifestId}/canvas/{canvasIndex}.json", name="canvas")
      */
-    public function manifestAction(Request $request, $manifestId = '')
+    public function getCanvas(Request $request, $manifestId = '', $canvasIndex = '')
     {
         // Make sure the service URL name ends with a trailing slash
         $baseUrl = rtrim($this->getParameter('service_url'), '/') . '/';
 
         $dm = $this->get('doctrine_mongodb')->getManager();
-        $manifests = $dm->createQueryBuilder('AppBundle\ImageHub\ManifestBundle\Document\Manifest')->field('manifestId')->equals($baseUrl . $manifestId . '/manifest.json')->getQuery()->execute();
-        $toServe = 'Sorry, the requested document does not exist.';
-        if(count($manifests) > 0) {
-            foreach($manifests as $manifest) {
-                $toServe = $manifest->getData();
+        $canvases = $dm->createQueryBuilder('AppBundle\Imagehub\CanvasBundle\Document\Canvas')->field('canvasId')->equals($baseUrl . $manifestId . '/canvas/' . $canvasIndex . '.json')->getQuery()->execute();
+        if(count($canvases) > 0) {
+            foreach($canvases as $canvas) {
+                $toServe = $canvas->getData();
             }
             $headers = array(
                 'Content-Type' => 'application/json',

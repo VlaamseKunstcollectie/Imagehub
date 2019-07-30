@@ -17,27 +17,27 @@ services:
         # if you need to do this, you can override this setting on individual services
         public: false
 
-    # makes classes in src/ImageHub available to be used as services
+    # makes classes in src/Imagehub available to be used as services
     # this creates a service per class whose id is the fully-qualified class name
-    AppBundle\ImageHub\:
-        resource: '../../src/AppBundle/ImageHub/*'
+    AppBundle\Imagehub\:
+        resource: '../../src/AppBundle/Imagehub/*'
         # you can exclude directories or files
         # but if a service is unused, it's removed anyway
-        exclude: '../../src/AppBundle/ImageHub/{Entity,Repository,Tests}'
+        exclude: '../../src/AppBundle/Imagehub/{Entity,Repository,Tests}'
 
     # controllers are imported separately to make sure they're public
     # and have a tag that allows actions to type-hint services
-    AppBundle\ImageHub\Controller\:
-        resource: '../../src/AppBundle/ImageHub/Controller'
+    AppBundle\Imagehub\Controller\:
+        resource: '../../src/AppBundle/Imagehub/Controller'
         public: true
         tags: ['controller.service_arguments']
 
     app.command.generate_manifests_command:
-        class: AppBundle\ImageHub\Command\GenerateManifestsCommand
+        class: AppBundle\Imagehub\Command\GenerateManifestsCommand
         tags:
             -  { name: console.command }
 
     # add more services, or override services that need manual wiring
-    # ImageHub\Service\ExampleService:
+    # Imagehub\Service\ExampleService:
     #     arguments:
     #         $someArgument: 'some_value'
