@@ -1,11 +1,9 @@
 <?php
 namespace AppBundle\ResourceSpace\Command;
 
-use AppBundle\ResourceSpace\ImageBundle\Document\Image;
 use DOMDocument;
 use DOMXPath;
 use Exception;
-use Imagick;
 use Phpoaipmh\Endpoint;
 use Phpoaipmh\Exception\HttpException;
 use Phpoaipmh\Exception\OaipmhException;
@@ -96,7 +94,6 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
 
                 if(strpos($imageName, '.') > -1) {
                     $this->logger->error('Error: file ' . $imageName . ' has a filename extension.');
-                    //TODO log incorrect filename
                     continue;
                 }
 
@@ -125,11 +122,9 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
 
                 if (!$isSupportedImage) {
                     $this->logger->error('Error: file ' . $imageName . ' does not have the correct extension.');
-                    // TODO log incorrect file extensions
                 }
                 if(!$isSupportedCompression) {
                     $this->logger->error('Error: file ' . $imageName . ' has the wrong image compression.');
-                    // TODO log incorrect image compression
                 }
 
                 if($isSupportedImage && $isSupportedCompression) {
@@ -149,36 +144,18 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
         }
     }
 
-    // Takes the first 50,000 and last 50,000 bytes of a file to generate a unique file hash
+    // Takes the first 50,000 bytes of a file to generate a unique file hash
     private function getImageHash($imagePath)
     {
         $fp = fopen($imagePath, 'r');
         $data = fgets($fp, 50000);
-
-        fseek($fp, -50000, SEEK_END);
-        $data .= fgets($fp, 50000);
 
         return md5($data);
     }
 
     private function processImage($dm, $imageName, $fullImagePath, $exifData)
     {
-        $fileChanged = true;
         $md5 = $this->getImageHash($fullImagePath);
-
-        // Find the corresponding file hash in MongoDB
-        $images = $dm->createQueryBuilder('AppBundle\ResourceSpace\ImageBundle\Document\Image')->field('filename')->equals($imageName)->getQuery()->execute();
-        if(count($images) > 0) {
-            foreach ($images as $image) {
-                if($image->getHash() == $md5) {
-                    $fileChanged = false;
-                } else {
-                    $dm->remove($image);
-                    $dm->flush();
-                    $dm->clear();
-                }
-            }
-        }
 
         // Extract appropriate EXIF data
         $dataPid = null;
@@ -257,6 +234,7 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
             if($resourceSpaceData['originalfilename'] == $newData['originalfilename']) {
                 $createNew = false;
 
+                $fileChanged = $resourceSpaceData['file_checksum'] != $md5;
                 // Re-upload the file if the checksums didn't match
                 if($fileChanged) {
                     $this->uploadToResourceSpace($dm, $md5, $id, $imageName, $fullImagePath, false);
@@ -391,48 +369,17 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
     {
         $result = -1;
 
-        $pos = strrpos($imageName, '.');
-        if($pos) {
-            $jpegImage = substr($imageName, 0, $pos) . '.jpg';
-        } else {
-            $jpegImage = $imageName . '.jpg';
-        }
-        $imageDimensions = getimagesize($fullImagePath);
-        $imageWidth = $imageDimensions[0];
-        $imageHeight = $imageDimensions[1];
         try {
-            $imagick = new Imagick();
-            $imagick->readImage($fullImagePath);
-            $maxDimension = $this->getContainer()->getParameter('scale_image_pixels');
-            if($imageWidth > $maxDimension || $imageHeight > $maxDimension) {
-                $imagick->scaleImage($imageWidth >= $imageHeight ? $maxDimension : 0, $imageWidth < $imageHeight ? $maxDimension : 0);
-            }
-            $imagick->setFormat('jpeg');
-            $imagick->writeImage($jpegImage);
-
             $success = false;
             if($createNew) {
-                $result = $this->uploadImage(realpath($jpegImage));
+                $result = $this->uploadImage(realpath($fullImagePath));
                 if($result > -1) {
                     $success = true;
                 }
             } else {
-                $success = $this->replaceImage($id, realpath($jpegImage));
+                $success = $this->replaceImage($id, realpath($fullImagePath));
             }
 
-            if($success) {
-                $newImage = new Image();
-                $newImage->setFilename($imageName);
-                $newImage->setHash($md5);
-                $dm->persist($newImage);
-                $dm->flush();
-                $dm->clear();
-            }
-            $imagick->clear();
-
-            if(file_exists($jpegImage)) {
-                unlink($jpegImage);
-            }
         } catch (Exception $e) {
             $this->logger->error($e);
         }
