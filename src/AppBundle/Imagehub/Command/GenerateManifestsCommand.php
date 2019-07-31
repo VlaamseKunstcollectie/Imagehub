@@ -47,6 +47,7 @@ class GenerateManifestsCommand extends ContainerAwareCommand
     private $imageData;
 
     private $verbose;
+    private $logger;
 
     // List of Datahub DOM documents and Xpath objects linked to these documents
     // These are created when requesting records from the Datahub and reused for inserting manifest and thumbnail URL's
@@ -64,6 +65,8 @@ class GenerateManifestsCommand extends ContainerAwareCommand
 
     protected function execute(InputInterface $input, OutputInterface $output)
     {
+        $this->logger = $this->getContainer()->get('logger');
+
         $this->datahubUrl = $input->getArgument('url');
         if(!$this->datahubUrl) {
             $this->datahubUrl = $this->getContainer()->getParameter('datahub_url');
@@ -177,7 +180,7 @@ class GenerateManifestsCommand extends ContainerAwareCommand
             }
 
             if($this->verbose) {
-                echo 'Retrieved ' . $dataPid . ' from ResourceSpace' . PHP_EOL;
+                $this->logger->info('Retrieved ' . $dataPid . ' from ResourceSpace');
             }
 
             $newDatahubData['manifest_id'] = $this->extractManifestId($dataPid);
@@ -220,10 +223,10 @@ class GenerateManifestsCommand extends ContainerAwareCommand
                 $this->imageData[$imageId]['height'] = $data->height;
                 $this->imageData[$imageId]['width'] = $data->width;
                 if($this->verbose) {
-                    echo 'Retrieved image ' . $imageId . ' from Cantaloupe' . PHP_EOL;
+                    $this->logger->info('Retrieved image ' . $imageId . ' from Cantaloupe');
                 }
             } catch(Exception $e) {
-                echo $e->getMessage() . PHP_EOL;
+                $this->logger->error($e->getMessage());
                 // TODO proper error reporting
             }
         }
@@ -240,24 +243,24 @@ class GenerateManifestsCommand extends ContainerAwareCommand
                 try {
                     $this->addDatahubDataToImage($dataPid);
                     if($this->verbose) {
-                        echo 'Added Datahub data to ' . $dataPid . PHP_EOL;
+                        $this->logger->info('Added Datahub data to ' . $dataPid);
                     }
                 }
                 catch(Exception $e) {
                     unset($this->imagehubData[$dataPid]);
                     if($this->verbose) {
-                        echo $e . PHP_EOL;
+                        $this->logger->error($e);
                     } else {
-                        echo $e->getMessage() . PHP_EOL;
+                        $this->logger->error($e->getMessage());
                     }
                 }
             }
         }
         catch(Exception $e) {
             if($this->verbose) {
-                echo $e . PHP_EOL;
+                $this->logger->error($e);
             } else {
-                echo $e->getMessage() . PHP_EOL;
+                $this->logger->error($e->getMessage());
             }
         }
     }
@@ -694,7 +697,7 @@ class GenerateManifestsCommand extends ContainerAwareCommand
             if($validate) {
                 $valid = $this->validateManifest($validatorUrl, $manifestId);
                 if (!$valid) {
-                    echo 'Manifest ' . $manifestId . ' is not valid.' . PHP_EOL;
+                    $this->logger->error('Manifest ' . $manifestId . ' is not valid.');
                     $dm->remove($manifestDocument);
                     $dm->flush();
                 }
@@ -703,7 +706,7 @@ class GenerateManifestsCommand extends ContainerAwareCommand
 
             if($valid) {
                 if($this->verbose) {
-                    echo 'Generated manifest ' . $manifestId . ' for data pid ' . $dataPid . PHP_EOL;
+                    $this->logger->info('Generated manifest ' . $manifestId . ' for data pid ' . $dataPid);
                 }
 
                 // Add to manifests array to add to the top-level collection
@@ -739,7 +742,7 @@ class GenerateManifestsCommand extends ContainerAwareCommand
         if($validate) {
             $valid = $this->validateManifest($validatorUrl, $collectionId);
             if (!$valid) {
-                echo 'Top-level collection ' . $collectionId . ' is not valid.' . PHP_EOL;
+                $this->logger->error('Top-level collection ' . $collectionId . ' is not valid.');
                 $dm->remove($manifestDocument);
                 $dm->flush();
             }
@@ -748,9 +751,9 @@ class GenerateManifestsCommand extends ContainerAwareCommand
 
         if($this->verbose) {
             if ($valid) {
-                echo 'Created and stored top-level collection' . PHP_EOL;
+                $this->logger->info('Created and stored top-level collection');
             }
-            echo 'Done, created and stored ' . $manifests . ' manifests.' . PHP_EOL;
+            $this->logger->info('Done, created and stored ' . $manifests . ' manifests.');
         }
     }
 
@@ -770,14 +773,14 @@ class GenerateManifestsCommand extends ContainerAwareCommand
             if (!empty($validatorResult->error)) {
                 if ($validatorResult->error != 'None') {
                     $valid = false;
-                    echo 'Manifest ' . $manifestId . ' error: ' . $validatorResult->error . PHP_EOL;
+                    $this->logger->error('Manifest ' . $manifestId . ' error: ' . $validatorResult->error);
                 }
             }
         } catch (Exception $e) {
             if($this->verbose) {
-                echo 'Error validating manifest ' . $manifestId . ': ' . $e . PHP_EOL;
+                $this->logger->error('Error validating manifest ' . $manifestId . ': ' . $e);
             } else {
-                echo 'Error validating manifest ' . $manifestId . ': ' . $e->getMessage() . PHP_EOL;
+                $this->logger->error('Error validating manifest ' . $manifestId . ': ' . $e->getMessage());
             }
         }
         return $valid;
@@ -898,7 +901,7 @@ class GenerateManifestsCommand extends ContainerAwareCommand
         $result = json_decode($resultJson);
         $this->datahubToken = $result->access_token;
         if($this->verbose) {
-            echo 'Datahub token: ' . $this->datahubToken . PHP_EOL;
+            $this->logger->info('Datahub token: ' . $this->datahubToken);
         }
     }
 
@@ -920,9 +923,9 @@ class GenerateManifestsCommand extends ContainerAwareCommand
 
         $responseCode = curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
         if(!empty($result) || $responseCode != 204) {
-            echo 'Error updating Datahub record ' . $dataPid . ': ' . PHP_EOL . $result . PHP_EOL;
+            $this->logger->error('Error updating Datahub record ' . $dataPid . ': ' . PHP_EOL . $result);
         } else if($this->verbose) {
-            echo 'Updated Datahub record ' . $dataPid . PHP_EOL;
+            $this->logger->info('Updated Datahub record ' . $dataPid);
         }
 
         curl_close($ch);

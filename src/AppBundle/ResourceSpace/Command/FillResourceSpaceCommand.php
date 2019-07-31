@@ -28,6 +28,7 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
     private $datahubEndpoint;
     private $exifFields;
     private $verbose;
+    private $logger;
 
     protected function configure()
     {
@@ -41,6 +42,8 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
 
     protected function execute(InputInterface $input, OutputInterface $output)
     {
+        $this->logger = $this->getContainer()->get('logger');
+
         $folder = $input->getArgument('folder');
         if (!$folder) {
             $folder = $this->getContainer()->getParameter('images_folder');
@@ -92,7 +95,7 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
                 $isSupportedCompression = false;
 
                 if(strpos($imageName, '.') > -1) {
-                    echo 'Error: file ' . $imageName . ' has a filename extension.' . PHP_EOL;
+                    $this->logger->error('Error: file ' . $imageName . ' has a filename extension.');
                     //TODO log incorrect filename
                     continue;
                 }
@@ -121,28 +124,28 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
                 }
 
                 if (!$isSupportedImage) {
-                    echo 'Error: file ' . $imageName . ' does not have the correct extension.' . PHP_EOL;
+                    $this->logger->error('Error: file ' . $imageName . ' does not have the correct extension.');
                     // TODO log incorrect file extensions
                 }
                 if(!$isSupportedCompression) {
-                    echo 'Error: file ' . $imageName . ' has the wrong image compression.' . PHP_EOL;
+                    $this->logger->error('Error: file ' . $imageName . ' has the wrong image compression.');
                     // TODO log incorrect image compression
                 }
 
                 if($isSupportedImage && $isSupportedCompression) {
                     if($this->verbose) {
-                        echo 'Processing ' . $imageName . PHP_EOL;
+                        $this->logger->info('Processing ' . $imageName);
                     }
                     $this->processImage($dm, $imageName, $fullImagePath, $exifData);
                     $totalImages++;
                 }
             }
             catch(Exception $e) {
-                echo $e . PHP_EOL;
+                $this->logger->error($e);
             }
         }
         if($this->verbose) {
-            echo 'Done, processed ' . $totalImages . ' total images' . PHP_EOL;
+            $this->logger->info('Done, processed ' . $totalImages . ' total images');
         }
     }
 
@@ -239,13 +242,13 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
                 }
             }
             catch(OaipmhException $e) {
-                echo 'Image ' . $fullImagePath . ' error: ' . $e . PHP_EOL;
+                $this->logger->error('Image ' . $fullImagePath . ' error: ' . $e);
             }
             catch(HttpException $e) {
-                echo 'Image ' . $fullImagePath . ' error: ' . $e . PHP_EOL;
+                $this->logger->error('Image ' . $fullImagePath . ' error: ' . $e);
             }
         } else {
-            echo 'Error: no data pid set on image ' . $fullImagePath . PHP_EOL;
+            $this->logger->error('Error: no data pid set on image ' . $fullImagePath);
         }
 
         $createNew = true;
@@ -265,7 +268,7 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
                     $update = false;
                     if(!array_key_exists($key, $resourceSpaceData)) {
                         if($this->verbose) {
-                            echo 'Field ' . $key . ' does not exist, should be ' . $value . PHP_EOL;
+                            $this->logger->error('Field ' . $key . ' does not exist, should be ' . $value);
                         }
                         $update = true;
                     } else if($key == 'keywords') {
@@ -287,14 +290,14 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
                         }
                         if(!$hasAll) {
                             if($this->verbose) {
-                                echo 'Mismatching field ' . $key . ', should be ' . $value . ', is ' . $resourceSpaceData[$key] . PHP_EOL;
+                                $this->logger->error('Mismatching field ' . $key . ', should be ' . $value . ', is ' . $resourceSpaceData[$key]);
                             }
                             $update = true;
                         }
                     } else {
                         if($resourceSpaceData[$key] != $value) {
                             if($this->verbose) {
-                                echo 'Mismatching field ' . $key . ', should be ' . $value . ', is ' . $resourceSpaceData[$key] . PHP_EOL;
+                                $this->logger->error('Mismatching field ' . $key . ', should be ' . $value . ', is ' . $resourceSpaceData[$key]);
                             }
                             $update = true;
                         }
@@ -302,7 +305,7 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
                     if($update) {
                         $result = $this->updateField($id, $key, $value);
                         if($result !== 'true') {
-                            echo 'Error updating field ' . $key . ' for image ' . $imageName . ':' . PHP_EOL . $result . PHP_EOL;
+                            $this->logger->error('Error updating field ' . $key . ' for image ' . $imageName . ':' . PHP_EOL . $result);
                             //TODO log when something went wrong
                         } else {
                             $updatedFields++;
@@ -311,11 +314,11 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
                 }
                 if($this->verbose) {
                     if($fileChanged && $updatedFields > 0) {
-                        echo 'Replaced image ' . $fullImagePath . ', updated ' . $updatedFields . ' fields' . PHP_EOL;
+                        $this->logger->info('Replaced image ' . $fullImagePath . ', updated ' . $updatedFields . ' fields');
                     } else if($fileChanged) {
-                        echo 'Replaced image ' . $fullImagePath . PHP_EOL;
+                        $this->logger->info('Replaced image ' . $fullImagePath);
                     } else if($updatedFields > 0) {
-                        echo 'Updated ' . $updatedFields . ' fields for image ' . $fullImagePath . PHP_EOL;
+                        $this->logger->info('Updated ' . $updatedFields . ' fields for image ' . $fullImagePath);
                     }
                 }
                 break;
@@ -330,18 +333,17 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
                 foreach($newData as $key => $value) {
                     $result = $this->updateField($newId, $key, $value);
                     if($result !== 'true') {
-                        echo 'Error adding field ' . $key . ' for image ' . $imageName . ':' . PHP_EOL . $result . PHP_EOL;
+                        $this->logger->error('Error adding field ' . $key . ' for image ' . $imageName . ':' . PHP_EOL . $result);
                         //TODO log the result if something went wrong
                     } else {
                         $fieldsAdded++;
                     }
                 }
                 if($this->verbose) {
-                    echo 'Uploaded image ' . $fullImagePath . ' to ResourceSpace, added ' . $fieldsAdded . ' fields' . PHP_EOL;
+                    $this->logger->info('Uploaded image ' . $fullImagePath . ' to ResourceSpace, added ' . $fieldsAdded . ' fields');
                 }
             } else {
-                echo 'Error creating resource ' . $imageName . ': ' . PHP_EOL . $newId . PHP_EOL;
-                //TODO log the result if something went wrong
+                $this->logger->error('Error creating resource ' . $imageName . ': ' . PHP_EOL . $newId);
             }
         }
     }
@@ -353,7 +355,7 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
         $allResources = file_get_contents($url);
 
         if($allResources == 'Invalid signature') {
-            echo 'Error: invalid ResourceSpace API key. Please paste the key found in the ResourceSpace user management into app/config/parameters.yml.' . PHP_EOL;
+            $this->logger->error('Error: invalid ResourceSpace API key. Please paste the key found in the ResourceSpace user management into app/config/parameters.yml.');
             return NULL;
         }
 
@@ -432,7 +434,7 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
                 unlink($jpegImage);
             }
         } catch (Exception $e) {
-            echo $e . PHP_EOL;
+            $this->logger->error($e);
         }
 
         return $result;
