@@ -177,7 +177,7 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
         if($dataPid != null) {
             try {
                 if (!$this->datahubEndpoint)
-                    $this->datahubEndpoint = Endpoint::build($this->datahubUrl);
+                    $this->datahubEndpoint = Endpoint::build($this->datahubUrl . '/oai');
 
                 $record = $this->datahubEndpoint->getRecord($dataPid, $this->metadataPrefix);
                 $data = $record->GetRecord->record->metadata->children($this->namespace, true);
