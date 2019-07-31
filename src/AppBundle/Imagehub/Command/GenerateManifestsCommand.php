@@ -766,8 +766,7 @@ class GenerateManifestsCommand extends ContainerAwareCommand
             $valid = $validatorResult->okay == 1;
             if (!empty($validatorResult->warnings)) {
                 foreach ($validatorResult->warnings as $warning) {
-                    // Validator warnings always end with a newline, so no need to append one here
-                    echo 'Manifest ' . $manifestId . ' warning: ' . $warning;
+                    $this->logger->warning('Manifest ' . $manifestId . ' warning: ' . $warning);
                 }
             }
             if (!empty($validatorResult->error)) {
