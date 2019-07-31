@@ -288,7 +288,6 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
                         $result = $this->updateField($id, $key, $value);
                         if($result !== 'true') {
                             $this->logger->error('Error updating field ' . $key . ' for image ' . $imageName . ':' . PHP_EOL . $result);
-                            //TODO log when something went wrong
                         } else {
                             $updatedFields++;
                         }
