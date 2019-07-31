@@ -431,15 +431,11 @@ class GenerateManifestsCommand extends ContainerAwareCommand
         // Add reference to itself
         foreach($this->imagehubData as $dataPid => $value) {
             if (!array_key_exists($dataPid, $value['related_works'])) {
-                if(!empty($value['related_works'])) {
-                    // TODO log this, shouldn't be possible
-                } else {
-                    $this->imagehubData[$dataPid]['related_works'][$dataPid] = array(
-                        'related_work_type' => 'relation',
-                        'data_pid'          => $dataPid,
-                        'sort_order'        => 1
-                    );
-                }
+                $this->imagehubData[$dataPid]['related_works'][$dataPid] = array(
+                    'related_work_type' => 'relation',
+                    'data_pid'          => $dataPid,
+                    'sort_order'        => 1
+                );
             }
         }
     }
