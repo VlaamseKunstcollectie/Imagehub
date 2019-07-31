@@ -99,13 +99,15 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
 
 
                 $exifData = exif_read_data($fullImagePath);
+                $extension = null;
 
                 // Check if the file is in (one of) the supported format(s)
                 if($exifData) {
                     if(array_key_exists('MimeType', $exifData)) {
                         foreach ($supportedExtensions as $supportedExtension) {
-                            if ($exifData['MimeType'] == $supportedExtension) {
+                            if ($exifData['MimeType'] == $supportedExtension['type']) {
                                 $isSupportedImage = true;
+                                $extension = $supportedExtension['extension'];
                                 break;
                             }
                         }
@@ -131,7 +133,7 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
                     if($this->verbose) {
                         $this->logger->info('Processing ' . $imageName);
                     }
-                    $this->processImage($dm, $imageName, $fullImagePath, $exifData);
+                    $this->processImage($dm, $imageName, $fullImagePath, $fullImagePath . '.' . $extension, $exifData);
                     $totalImages++;
                 }
             }
@@ -153,7 +155,7 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
         return md5($data);
     }
 
-    private function processImage($dm, $imageName, $fullImagePath, $exifData)
+    private function processImage($dm, $imageName, $fullImagePath, $imageWithExtension, $exifData)
     {
         $md5 = $this->getImageHash($fullImagePath);
 
@@ -237,7 +239,9 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
                 $fileChanged = $resourceSpaceData['file_checksum'] != $md5;
                 // Re-upload the file if the checksums didn't match
                 if($fileChanged) {
-                    $this->uploadToResourceSpace($dm, $md5, $id, $imageName, $fullImagePath, false);
+                    rename($fullImagePath, $imageWithExtension);
+                    $this->uploadToResourceSpace($dm, $md5, $id, $imageName, $imageWithExtension, false);
+                    rename($imageWithExtension, $fullImagePath);
                 }
 
                 // Update fields in ResourceSpace where necessary
@@ -305,7 +309,9 @@ class FillResourceSpaceCommand extends ContainerAwareCommand
 
         // Upload a new file and set all metadata fields if this resource doesn't exist yet
         if($createNew) {
-            $newId = $this->uploadToResourceSpace($dm, $md5, -1, $imageName, $fullImagePath, true);
+            rename($fullImagePath, $imageWithExtension);
+            $newId = $this->uploadToResourceSpace($dm, $md5, -1, $imageName, $imageWithExtension, true);
+            rename($imageWithExtension, $fullImagePath);
             if(preg_match('/^[0-9]+$/', $newId)) {
                 $fieldsAdded = 0;
                 foreach($newData as $key => $value) {
