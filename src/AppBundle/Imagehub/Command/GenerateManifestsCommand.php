@@ -753,7 +753,7 @@ class GenerateManifestsCommand extends ContainerAwareCommand
             if ($valid) {
                 $this->logger->info('Created and stored top-level collection');
             }
-            $this->logger->info('Done, created and stored ' . $manifests . ' manifests.');
+            $this->logger->info('Done, created and stored ' . count($manifests) . ' manifests.');
         }
     }
 
