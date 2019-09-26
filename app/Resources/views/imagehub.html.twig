@@ -4,11 +4,14 @@
     <br>
     <div class="jumbotron">
         <h1>{{ 'Imagehub' }}</h1>
-        <p>The Imagehub is a web application based on the Symfony framework and has two main components: a IIIF Image API, and a IIIF Presentation API. Read all about the IIIF Presentation API implementation on the <a href="{{ path('iiif') }}">IIIF page</a>. The IIIF Image API consists of a Cantaloupe Image server exposing digitised 2D images of artworks by Flemish Cultural Heritage institutions.</p>
+        <p>The Imagehub is a web application based on the Symfony framework and has two main components: a IIIF Image API, and a IIIF Presentation API. Read all about the IIIF Presentation API implementation on the <a href="{{ path('iiif') }}">IIIF page</a>. 
+        The IIIF Image API consists of a Cantaloupe Image server exposing digitised 2D images of artworks by 
+        Flemish Cultural Heritage institutions.</p>
         <p>Example image: <a href="http://imagehub.vlaamsekunstcollectie.be/iiif/2/100000150/full/full/0/default.jpg">http://imagehub.vlaamsekunstcollectie.be/iiif/2/100000150/full/full/0/default.jpg</a></p>
-        <p>The images made available through Cantaloupe can be processed and transformed in any way the <a href="https://iiif.io/api/image/2.1/">IIIF Image API</a> v2.1.1. allows.</p>
+        <p>The images made available through Cantaloupe can be processed and transformed in any way 
+        the <a href="https://iiif.io/api/image/2.1/">IIIF Image API 2.1.1</a> allows.</p>
         <p>The example image above can be transformed to only show a piece of the image, rotate the image, scale the size of the image, and change the color scheme of the image.</p>
         <p>Example transformed image: <a href="http://imagehub.vlaamsekunstcollectie.be/iiif/2/100000150/1700,1400,900,760/pct:50/20/gray.jpg">http://imagehub.vlaamsekunstcollectie.be/iiif/2/100000150/1700,1400,900,760/pct:50/20/gray.jpg</a></p>
-        <p>The imagehub is designed to be used in conjunction with the datahub to create two platforms that openly exchange both image data and object metadata. These two platforms can be used as a basis to create re-use applications for cultural heritage collection discovery. The Flemish Art Collection's main reuse application is the Arthub Flanders, which uses the datahub for metadata delivery in the LIDO XML format and the imagehub for delivery of images in manifest.json format. These manifest.json files are loaded into an implementation of Universal Viewer 2. Discover Flemish Art Collections art <a href="http://arthub.vlaamsekunstcollectie.be">arthub.vlaamsekunstcollectie.be</a></p>
+        <p>The Imagehub is designed to be used in conjunction with the <a href="http://datahub.vlaamsekunstcollectie.be/">Datahub</a> to create two platforms that openly exchange both image data and object metadata. These two platforms can be used as a basis to create re-use applications for cultural heritage collection discovery. The Flemish Art Collection's main reuse application is the Arthub Flanders, which uses the datahub for metadata delivery in the LIDO XML format and the imagehub for delivery of images in manifest.json format. These manifest.json files are loaded into an implementation of Universal Viewer 2. Discover Flemish Art Collections art <a href="http://arthub.vlaamsekunstcollectie.be">arthub.vlaamsekunstcollectie.be</a></p>
     </div>
 {% endblock %}
