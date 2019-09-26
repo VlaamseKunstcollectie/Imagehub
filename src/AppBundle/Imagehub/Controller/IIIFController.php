@@ -10,6 +10,7 @@ class IIIFController extends Controller
 {
     /**
      * @Route("/iiif", name="iiif")
+     * @Route("/iiif/", name="iiif")
      */
     public function iiifAction(Request $request)
     {
